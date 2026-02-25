@@ -8,6 +8,8 @@ import '../features/feed/presentation/views/post_details_view.dart';
 import '../features/chat/presentation/controllers/chat_controller.dart';
 import '../features/chat/presentation/views/chat_view.dart';
 import '../features/notification/presentation/views/notifications_view.dart';
+import '../features/auth/presentation/views/registration_view.dart';
+import '../features/auth/presentation/views/social_auth_view.dart';
 import '../presentation/layouts/main_layout.dart';
 
 class AppPages {
@@ -22,6 +24,14 @@ class AppPages {
           Get.lazyPut(() => AuthController());
         }
       }),
+    ),
+    GetPage(
+      name: '/register',
+      page: () => const RegistrationView(),
+    ),
+    GetPage(
+      name: '/social-auth',
+      page: () => const SocialAuthView(),
     ),
     GetPage(
       name: '/',

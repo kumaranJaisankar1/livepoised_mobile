@@ -42,6 +42,7 @@ dependencies:
   # Authentication
   flutter_appauth: ^6.0.4
   flutter_secure_storage: ^9.0.0
+  crypto: ^3.0.3
 
   # Chat & WebSockets
   web_socket_channel: ^2.4.3
@@ -56,6 +57,8 @@ dependencies:
   font_awesome_flutter: ^10.7.0
   intl: ^0.19.0
   timeago: ^3.6.1
+  url_launcher: ^6.2.5
+  webview_flutter: ^4.10.0
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.

@@ -3,6 +3,8 @@ import 'package:get/get.dart';
 import 'auth_service.dart';
 import '../../core/storage/secure_storage_service.dart';
 
+import 'package:url_launcher/url_launcher.dart';
+
 class AuthController extends GetxController {
   final AuthService _authService = AuthService();
   final SecureStorageService _storage = SecureStorageService();
@@ -51,8 +53,35 @@ class AuthController extends GetxController {
   }
 
   Future<void> logout() async {
+    isLoading.value = true;
     await _authService.logout();
     isLoggedIn.value = false;
+    isLoading.value = false;
     Get.offAllNamed('/login');
+  }
+
+  Future<void> openRegistration() async {
+    Get.toNamed('/register');
+  }
+
+  Future<void> loginWithGoogle() async {
+    Get.toNamed('/social-auth', arguments: {'provider': 'google'});
+  }
+
+  Future<void> handleSocialAuthCallback(String code) async {
+    isLoading.value = true;
+    try {
+      final success = await _authService.exchangeCodeForToken(code);
+      if (success) {
+        checkAuthStatus(); // Refresh isLoggedIn observable
+        Get.offAllNamed('/');
+      } else {
+        Get.snackbar('Error', 'Social login failed during token exchange');
+      }
+    } catch (e) {
+      Get.snackbar('Error', 'An unexpected error occurred: $e');
+    } finally {
+      isLoading.value = false;
+    }
   }
 }

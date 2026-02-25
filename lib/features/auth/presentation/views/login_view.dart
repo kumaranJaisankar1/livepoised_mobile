@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:livepoised_mobile/features/auth/auth_controller.dart';
 
 class LoginView extends GetView<AuthController> {
@@ -121,12 +122,42 @@ class LoginView extends GetView<AuthController> {
                         ),
                   ),
                 )),
+
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(child: Divider(color: theme.dividerColor)),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text('OR', style: TextStyle(color: theme.hintColor)),
+                    ),
+                    Expanded(child: Divider(color: theme.dividerColor)),
+                  ],
+                ),
+                const SizedBox(height: 24),
+
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: theme.dividerColor),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    icon: const FaIcon(FontAwesomeIcons.google, color: Colors.redAccent, size: 20),
+                    label: const Text(
+                      'Continue with Google',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                    ),
+                    onPressed: () => controller.loginWithGoogle(),
+                  ),
+                ),
                 
                 const SizedBox(height: 24),
                 TextButton(
-                  onPressed: () {
-                    // Navigate to Register (if applicable)
-                  },
+                  onPressed: () => controller.openRegistration(),
                   child: Text(
                     "Don't have an account? Sign Up",
                     style: TextStyle(color: theme.colorScheme.primary),
