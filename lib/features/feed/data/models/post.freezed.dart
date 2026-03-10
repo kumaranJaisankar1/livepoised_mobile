@@ -21,17 +21,33 @@ Post _$PostFromJson(Map<String, dynamic> json) {
 
 /// @nodoc
 mixin _$Post {
-  String get id => throw _privateConstructorUsedError;
-  String get authorId => throw _privateConstructorUsedError;
-  String get authorName => throw _privateConstructorUsedError;
-  String? get authorAvatar => throw _privateConstructorUsedError;
+  dynamic get id =>
+      throw _privateConstructorUsedError; // API says id can be any (UUID or number)
+  String get title => throw _privateConstructorUsedError;
   String get content => throw _privateConstructorUsedError;
-  DateTime get createdAt => throw _privateConstructorUsedError;
-  int get likesCount => throw _privateConstructorUsedError;
-  int get repliesCount => throw _privateConstructorUsedError;
-  List<String> get hashtags => throw _privateConstructorUsedError;
-  String? get medicalCategory => throw _privateConstructorUsedError;
+  List<String> get tags => throw _privateConstructorUsedError;
+  @JsonKey(name: 'author_name')
+  String get authorName => throw _privateConstructorUsedError;
+  @JsonKey(name: 'author_role')
+  String get authorRole => throw _privateConstructorUsedError;
+  @JsonKey(name: 'author_image_url')
+  String? get authorImageUrl => throw _privateConstructorUsedError;
+  int get likes => throw _privateConstructorUsedError;
+  @JsonKey(name: 'comments_count')
+  int get commentsCount => throw _privateConstructorUsedError;
+  @JsonKey(name: 'is_liked')
   bool get isLiked => throw _privateConstructorUsedError;
+  @JsonKey(name: 'created_at')
+  DateTime get createdAt => throw _privateConstructorUsedError;
+  @JsonKey(name: 'updated_at')
+  DateTime? get updatedAt => throw _privateConstructorUsedError; // Additional fields from sample JSON
+  String? get visibility => throw _privateConstructorUsedError;
+  @JsonKey(name: 'community_id')
+  dynamic get communityId => throw _privateConstructorUsedError;
+  @JsonKey(name: 'author_user_id')
+  String? get authorUserId => throw _privateConstructorUsedError;
+  @JsonKey(name: 'liked_by')
+  List<String> get likedBy => throw _privateConstructorUsedError;
 
   /// Serializes this Post to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -48,17 +64,22 @@ abstract class $PostCopyWith<$Res> {
       _$PostCopyWithImpl<$Res, Post>;
   @useResult
   $Res call({
-    String id,
-    String authorId,
-    String authorName,
-    String? authorAvatar,
+    dynamic id,
+    String title,
     String content,
-    DateTime createdAt,
-    int likesCount,
-    int repliesCount,
-    List<String> hashtags,
-    String? medicalCategory,
-    bool isLiked,
+    List<String> tags,
+    @JsonKey(name: 'author_name') String authorName,
+    @JsonKey(name: 'author_role') String authorRole,
+    @JsonKey(name: 'author_image_url') String? authorImageUrl,
+    int likes,
+    @JsonKey(name: 'comments_count') int commentsCount,
+    @JsonKey(name: 'is_liked') bool isLiked,
+    @JsonKey(name: 'created_at') DateTime createdAt,
+    @JsonKey(name: 'updated_at') DateTime? updatedAt,
+    String? visibility,
+    @JsonKey(name: 'community_id') dynamic communityId,
+    @JsonKey(name: 'author_user_id') String? authorUserId,
+    @JsonKey(name: 'liked_by') List<String> likedBy,
   });
 }
 
@@ -77,64 +98,89 @@ class _$PostCopyWithImpl<$Res, $Val extends Post>
   @pragma('vm:prefer-inline')
   @override
   $Res call({
-    Object? id = null,
-    Object? authorId = null,
-    Object? authorName = null,
-    Object? authorAvatar = freezed,
+    Object? id = freezed,
+    Object? title = null,
     Object? content = null,
-    Object? createdAt = null,
-    Object? likesCount = null,
-    Object? repliesCount = null,
-    Object? hashtags = null,
-    Object? medicalCategory = freezed,
+    Object? tags = null,
+    Object? authorName = null,
+    Object? authorRole = null,
+    Object? authorImageUrl = freezed,
+    Object? likes = null,
+    Object? commentsCount = null,
     Object? isLiked = null,
+    Object? createdAt = null,
+    Object? updatedAt = freezed,
+    Object? visibility = freezed,
+    Object? communityId = freezed,
+    Object? authorUserId = freezed,
+    Object? likedBy = null,
   }) {
     return _then(
       _value.copyWith(
-            id: null == id
+            id: freezed == id
                 ? _value.id
                 : id // ignore: cast_nullable_to_non_nullable
+                      as dynamic,
+            title: null == title
+                ? _value.title
+                : title // ignore: cast_nullable_to_non_nullable
                       as String,
-            authorId: null == authorId
-                ? _value.authorId
-                : authorId // ignore: cast_nullable_to_non_nullable
-                      as String,
-            authorName: null == authorName
-                ? _value.authorName
-                : authorName // ignore: cast_nullable_to_non_nullable
-                      as String,
-            authorAvatar: freezed == authorAvatar
-                ? _value.authorAvatar
-                : authorAvatar // ignore: cast_nullable_to_non_nullable
-                      as String?,
             content: null == content
                 ? _value.content
                 : content // ignore: cast_nullable_to_non_nullable
                       as String,
-            createdAt: null == createdAt
-                ? _value.createdAt
-                : createdAt // ignore: cast_nullable_to_non_nullable
-                      as DateTime,
-            likesCount: null == likesCount
-                ? _value.likesCount
-                : likesCount // ignore: cast_nullable_to_non_nullable
-                      as int,
-            repliesCount: null == repliesCount
-                ? _value.repliesCount
-                : repliesCount // ignore: cast_nullable_to_non_nullable
-                      as int,
-            hashtags: null == hashtags
-                ? _value.hashtags
-                : hashtags // ignore: cast_nullable_to_non_nullable
+            tags: null == tags
+                ? _value.tags
+                : tags // ignore: cast_nullable_to_non_nullable
                       as List<String>,
-            medicalCategory: freezed == medicalCategory
-                ? _value.medicalCategory
-                : medicalCategory // ignore: cast_nullable_to_non_nullable
+            authorName: null == authorName
+                ? _value.authorName
+                : authorName // ignore: cast_nullable_to_non_nullable
+                      as String,
+            authorRole: null == authorRole
+                ? _value.authorRole
+                : authorRole // ignore: cast_nullable_to_non_nullable
+                      as String,
+            authorImageUrl: freezed == authorImageUrl
+                ? _value.authorImageUrl
+                : authorImageUrl // ignore: cast_nullable_to_non_nullable
                       as String?,
+            likes: null == likes
+                ? _value.likes
+                : likes // ignore: cast_nullable_to_non_nullable
+                      as int,
+            commentsCount: null == commentsCount
+                ? _value.commentsCount
+                : commentsCount // ignore: cast_nullable_to_non_nullable
+                      as int,
             isLiked: null == isLiked
                 ? _value.isLiked
                 : isLiked // ignore: cast_nullable_to_non_nullable
                       as bool,
+            createdAt: null == createdAt
+                ? _value.createdAt
+                : createdAt // ignore: cast_nullable_to_non_nullable
+                      as DateTime,
+            updatedAt: freezed == updatedAt
+                ? _value.updatedAt
+                : updatedAt // ignore: cast_nullable_to_non_nullable
+                      as DateTime?,
+            visibility: freezed == visibility
+                ? _value.visibility
+                : visibility // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            communityId: freezed == communityId
+                ? _value.communityId
+                : communityId // ignore: cast_nullable_to_non_nullable
+                      as dynamic,
+            authorUserId: freezed == authorUserId
+                ? _value.authorUserId
+                : authorUserId // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            likedBy: null == likedBy
+                ? _value.likedBy
+                : likedBy // ignore: cast_nullable_to_non_nullable
+                      as List<String>,
           )
           as $Val,
     );
@@ -150,17 +196,22 @@ abstract class _$$PostImplCopyWith<$Res> implements $PostCopyWith<$Res> {
   @override
   @useResult
   $Res call({
-    String id,
-    String authorId,
-    String authorName,
-    String? authorAvatar,
+    dynamic id,
+    String title,
     String content,
-    DateTime createdAt,
-    int likesCount,
-    int repliesCount,
-    List<String> hashtags,
-    String? medicalCategory,
-    bool isLiked,
+    List<String> tags,
+    @JsonKey(name: 'author_name') String authorName,
+    @JsonKey(name: 'author_role') String authorRole,
+    @JsonKey(name: 'author_image_url') String? authorImageUrl,
+    int likes,
+    @JsonKey(name: 'comments_count') int commentsCount,
+    @JsonKey(name: 'is_liked') bool isLiked,
+    @JsonKey(name: 'created_at') DateTime createdAt,
+    @JsonKey(name: 'updated_at') DateTime? updatedAt,
+    String? visibility,
+    @JsonKey(name: 'community_id') dynamic communityId,
+    @JsonKey(name: 'author_user_id') String? authorUserId,
+    @JsonKey(name: 'liked_by') List<String> likedBy,
   });
 }
 
@@ -176,64 +227,89 @@ class __$$PostImplCopyWithImpl<$Res>
   @pragma('vm:prefer-inline')
   @override
   $Res call({
-    Object? id = null,
-    Object? authorId = null,
-    Object? authorName = null,
-    Object? authorAvatar = freezed,
+    Object? id = freezed,
+    Object? title = null,
     Object? content = null,
-    Object? createdAt = null,
-    Object? likesCount = null,
-    Object? repliesCount = null,
-    Object? hashtags = null,
-    Object? medicalCategory = freezed,
+    Object? tags = null,
+    Object? authorName = null,
+    Object? authorRole = null,
+    Object? authorImageUrl = freezed,
+    Object? likes = null,
+    Object? commentsCount = null,
     Object? isLiked = null,
+    Object? createdAt = null,
+    Object? updatedAt = freezed,
+    Object? visibility = freezed,
+    Object? communityId = freezed,
+    Object? authorUserId = freezed,
+    Object? likedBy = null,
   }) {
     return _then(
       _$PostImpl(
-        id: null == id
+        id: freezed == id
             ? _value.id
             : id // ignore: cast_nullable_to_non_nullable
+                  as dynamic,
+        title: null == title
+            ? _value.title
+            : title // ignore: cast_nullable_to_non_nullable
                   as String,
-        authorId: null == authorId
-            ? _value.authorId
-            : authorId // ignore: cast_nullable_to_non_nullable
-                  as String,
-        authorName: null == authorName
-            ? _value.authorName
-            : authorName // ignore: cast_nullable_to_non_nullable
-                  as String,
-        authorAvatar: freezed == authorAvatar
-            ? _value.authorAvatar
-            : authorAvatar // ignore: cast_nullable_to_non_nullable
-                  as String?,
         content: null == content
             ? _value.content
             : content // ignore: cast_nullable_to_non_nullable
                   as String,
-        createdAt: null == createdAt
-            ? _value.createdAt
-            : createdAt // ignore: cast_nullable_to_non_nullable
-                  as DateTime,
-        likesCount: null == likesCount
-            ? _value.likesCount
-            : likesCount // ignore: cast_nullable_to_non_nullable
-                  as int,
-        repliesCount: null == repliesCount
-            ? _value.repliesCount
-            : repliesCount // ignore: cast_nullable_to_non_nullable
-                  as int,
-        hashtags: null == hashtags
-            ? _value._hashtags
-            : hashtags // ignore: cast_nullable_to_non_nullable
+        tags: null == tags
+            ? _value._tags
+            : tags // ignore: cast_nullable_to_non_nullable
                   as List<String>,
-        medicalCategory: freezed == medicalCategory
-            ? _value.medicalCategory
-            : medicalCategory // ignore: cast_nullable_to_non_nullable
+        authorName: null == authorName
+            ? _value.authorName
+            : authorName // ignore: cast_nullable_to_non_nullable
+                  as String,
+        authorRole: null == authorRole
+            ? _value.authorRole
+            : authorRole // ignore: cast_nullable_to_non_nullable
+                  as String,
+        authorImageUrl: freezed == authorImageUrl
+            ? _value.authorImageUrl
+            : authorImageUrl // ignore: cast_nullable_to_non_nullable
                   as String?,
+        likes: null == likes
+            ? _value.likes
+            : likes // ignore: cast_nullable_to_non_nullable
+                  as int,
+        commentsCount: null == commentsCount
+            ? _value.commentsCount
+            : commentsCount // ignore: cast_nullable_to_non_nullable
+                  as int,
         isLiked: null == isLiked
             ? _value.isLiked
             : isLiked // ignore: cast_nullable_to_non_nullable
                   as bool,
+        createdAt: null == createdAt
+            ? _value.createdAt
+            : createdAt // ignore: cast_nullable_to_non_nullable
+                  as DateTime,
+        updatedAt: freezed == updatedAt
+            ? _value.updatedAt
+            : updatedAt // ignore: cast_nullable_to_non_nullable
+                  as DateTime?,
+        visibility: freezed == visibility
+            ? _value.visibility
+            : visibility // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        communityId: freezed == communityId
+            ? _value.communityId
+            : communityId // ignore: cast_nullable_to_non_nullable
+                  as dynamic,
+        authorUserId: freezed == authorUserId
+            ? _value.authorUserId
+            : authorUserId // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        likedBy: null == likedBy
+            ? _value._likedBy
+            : likedBy // ignore: cast_nullable_to_non_nullable
+                  as List<String>,
       ),
     );
   }
@@ -244,57 +320,88 @@ class __$$PostImplCopyWithImpl<$Res>
 class _$PostImpl implements _Post {
   const _$PostImpl({
     required this.id,
-    required this.authorId,
-    required this.authorName,
-    this.authorAvatar,
+    required this.title,
     required this.content,
-    required this.createdAt,
-    this.likesCount = 0,
-    this.repliesCount = 0,
-    final List<String> hashtags = const [],
-    this.medicalCategory,
-    this.isLiked = false,
-  }) : _hashtags = hashtags;
+    final List<String> tags = const [],
+    @JsonKey(name: 'author_name') required this.authorName,
+    @JsonKey(name: 'author_role') required this.authorRole,
+    @JsonKey(name: 'author_image_url') this.authorImageUrl,
+    this.likes = 0,
+    @JsonKey(name: 'comments_count') this.commentsCount = 0,
+    @JsonKey(name: 'is_liked') this.isLiked = false,
+    @JsonKey(name: 'created_at') required this.createdAt,
+    @JsonKey(name: 'updated_at') this.updatedAt,
+    this.visibility,
+    @JsonKey(name: 'community_id') this.communityId,
+    @JsonKey(name: 'author_user_id') this.authorUserId,
+    @JsonKey(name: 'liked_by') final List<String> likedBy = const [],
+  }) : _tags = tags,
+       _likedBy = likedBy;
 
   factory _$PostImpl.fromJson(Map<String, dynamic> json) =>
       _$$PostImplFromJson(json);
 
   @override
-  final String id;
+  final dynamic id;
+  // API says id can be any (UUID or number)
   @override
-  final String authorId;
-  @override
-  final String authorName;
-  @override
-  final String? authorAvatar;
+  final String title;
   @override
   final String content;
-  @override
-  final DateTime createdAt;
-  @override
-  @JsonKey()
-  final int likesCount;
+  final List<String> _tags;
   @override
   @JsonKey()
-  final int repliesCount;
-  final List<String> _hashtags;
-  @override
-  @JsonKey()
-  List<String> get hashtags {
-    if (_hashtags is EqualUnmodifiableListView) return _hashtags;
+  List<String> get tags {
+    if (_tags is EqualUnmodifiableListView) return _tags;
     // ignore: implicit_dynamic_type
-    return EqualUnmodifiableListView(_hashtags);
+    return EqualUnmodifiableListView(_tags);
   }
 
   @override
-  final String? medicalCategory;
+  @JsonKey(name: 'author_name')
+  final String authorName;
+  @override
+  @JsonKey(name: 'author_role')
+  final String authorRole;
+  @override
+  @JsonKey(name: 'author_image_url')
+  final String? authorImageUrl;
   @override
   @JsonKey()
+  final int likes;
+  @override
+  @JsonKey(name: 'comments_count')
+  final int commentsCount;
+  @override
+  @JsonKey(name: 'is_liked')
   final bool isLiked;
+  @override
+  @JsonKey(name: 'created_at')
+  final DateTime createdAt;
+  @override
+  @JsonKey(name: 'updated_at')
+  final DateTime? updatedAt;
+  // Additional fields from sample JSON
+  @override
+  final String? visibility;
+  @override
+  @JsonKey(name: 'community_id')
+  final dynamic communityId;
+  @override
+  @JsonKey(name: 'author_user_id')
+  final String? authorUserId;
+  final List<String> _likedBy;
+  @override
+  @JsonKey(name: 'liked_by')
+  List<String> get likedBy {
+    if (_likedBy is EqualUnmodifiableListView) return _likedBy;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_likedBy);
+  }
 
   @override
   String toString() {
-    return 'Post(id: $id, authorId: $authorId, authorName: $authorName, authorAvatar: $authorAvatar, content: $content, createdAt: $createdAt, likesCount: $likesCount, repliesCount: $repliesCount, hashtags: $hashtags, medicalCategory: $medicalCategory, isLiked: $isLiked)';
+    return 'Post(id: $id, title: $title, content: $content, tags: $tags, authorName: $authorName, authorRole: $authorRole, authorImageUrl: $authorImageUrl, likes: $likes, commentsCount: $commentsCount, isLiked: $isLiked, createdAt: $createdAt, updatedAt: $updatedAt, visibility: $visibility, communityId: $communityId, authorUserId: $authorUserId, likedBy: $likedBy)';
   }
 
   @override
@@ -302,41 +409,55 @@ class _$PostImpl implements _Post {
     return identical(this, other) ||
         (other.runtimeType == runtimeType &&
             other is _$PostImpl &&
-            (identical(other.id, id) || other.id == id) &&
-            (identical(other.authorId, authorId) ||
-                other.authorId == authorId) &&
+            const DeepCollectionEquality().equals(other.id, id) &&
+            (identical(other.title, title) || other.title == title) &&
+            (identical(other.content, content) || other.content == content) &&
+            const DeepCollectionEquality().equals(other._tags, _tags) &&
             (identical(other.authorName, authorName) ||
                 other.authorName == authorName) &&
-            (identical(other.authorAvatar, authorAvatar) ||
-                other.authorAvatar == authorAvatar) &&
-            (identical(other.content, content) || other.content == content) &&
+            (identical(other.authorRole, authorRole) ||
+                other.authorRole == authorRole) &&
+            (identical(other.authorImageUrl, authorImageUrl) ||
+                other.authorImageUrl == authorImageUrl) &&
+            (identical(other.likes, likes) || other.likes == likes) &&
+            (identical(other.commentsCount, commentsCount) ||
+                other.commentsCount == commentsCount) &&
+            (identical(other.isLiked, isLiked) || other.isLiked == isLiked) &&
             (identical(other.createdAt, createdAt) ||
                 other.createdAt == createdAt) &&
-            (identical(other.likesCount, likesCount) ||
-                other.likesCount == likesCount) &&
-            (identical(other.repliesCount, repliesCount) ||
-                other.repliesCount == repliesCount) &&
-            const DeepCollectionEquality().equals(other._hashtags, _hashtags) &&
-            (identical(other.medicalCategory, medicalCategory) ||
-                other.medicalCategory == medicalCategory) &&
-            (identical(other.isLiked, isLiked) || other.isLiked == isLiked));
+            (identical(other.updatedAt, updatedAt) ||
+                other.updatedAt == updatedAt) &&
+            (identical(other.visibility, visibility) ||
+                other.visibility == visibility) &&
+            const DeepCollectionEquality().equals(
+              other.communityId,
+              communityId,
+            ) &&
+            (identical(other.authorUserId, authorUserId) ||
+                other.authorUserId == authorUserId) &&
+            const DeepCollectionEquality().equals(other._likedBy, _likedBy));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
   int get hashCode => Object.hash(
     runtimeType,
-    id,
-    authorId,
-    authorName,
-    authorAvatar,
+    const DeepCollectionEquality().hash(id),
+    title,
     content,
-    createdAt,
-    likesCount,
-    repliesCount,
-    const DeepCollectionEquality().hash(_hashtags),
-    medicalCategory,
+    const DeepCollectionEquality().hash(_tags),
+    authorName,
+    authorRole,
+    authorImageUrl,
+    likes,
+    commentsCount,
     isLiked,
+    createdAt,
+    updatedAt,
+    visibility,
+    const DeepCollectionEquality().hash(communityId),
+    authorUserId,
+    const DeepCollectionEquality().hash(_likedBy),
   );
 
   /// Create a copy of Post
@@ -355,43 +476,68 @@ class _$PostImpl implements _Post {
 
 abstract class _Post implements Post {
   const factory _Post({
-    required final String id,
-    required final String authorId,
-    required final String authorName,
-    final String? authorAvatar,
+    required final dynamic id,
+    required final String title,
     required final String content,
-    required final DateTime createdAt,
-    final int likesCount,
-    final int repliesCount,
-    final List<String> hashtags,
-    final String? medicalCategory,
-    final bool isLiked,
+    final List<String> tags,
+    @JsonKey(name: 'author_name') required final String authorName,
+    @JsonKey(name: 'author_role') required final String authorRole,
+    @JsonKey(name: 'author_image_url') final String? authorImageUrl,
+    final int likes,
+    @JsonKey(name: 'comments_count') final int commentsCount,
+    @JsonKey(name: 'is_liked') final bool isLiked,
+    @JsonKey(name: 'created_at') required final DateTime createdAt,
+    @JsonKey(name: 'updated_at') final DateTime? updatedAt,
+    final String? visibility,
+    @JsonKey(name: 'community_id') final dynamic communityId,
+    @JsonKey(name: 'author_user_id') final String? authorUserId,
+    @JsonKey(name: 'liked_by') final List<String> likedBy,
   }) = _$PostImpl;
 
   factory _Post.fromJson(Map<String, dynamic> json) = _$PostImpl.fromJson;
 
   @override
-  String get id;
+  dynamic get id; // API says id can be any (UUID or number)
   @override
-  String get authorId;
-  @override
-  String get authorName;
-  @override
-  String? get authorAvatar;
+  String get title;
   @override
   String get content;
   @override
+  List<String> get tags;
+  @override
+  @JsonKey(name: 'author_name')
+  String get authorName;
+  @override
+  @JsonKey(name: 'author_role')
+  String get authorRole;
+  @override
+  @JsonKey(name: 'author_image_url')
+  String? get authorImageUrl;
+  @override
+  int get likes;
+  @override
+  @JsonKey(name: 'comments_count')
+  int get commentsCount;
+  @override
+  @JsonKey(name: 'is_liked')
+  bool get isLiked;
+  @override
+  @JsonKey(name: 'created_at')
   DateTime get createdAt;
   @override
-  int get likesCount;
+  @JsonKey(name: 'updated_at')
+  DateTime? get updatedAt; // Additional fields from sample JSON
   @override
-  int get repliesCount;
+  String? get visibility;
   @override
-  List<String> get hashtags;
+  @JsonKey(name: 'community_id')
+  dynamic get communityId;
   @override
-  String? get medicalCategory;
+  @JsonKey(name: 'author_user_id')
+  String? get authorUserId;
   @override
-  bool get isLiked;
+  @JsonKey(name: 'liked_by')
+  List<String> get likedBy;
 
   /// Create a copy of Post
   /// with the given fields replaced by the non-null parameter values.

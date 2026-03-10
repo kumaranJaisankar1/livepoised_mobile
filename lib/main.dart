@@ -7,6 +7,9 @@ import 'core/theme/dark_theme.dart';
 import 'core/theme/theme_controller.dart';
 import 'routes/app_pages.dart';
 import 'features/auth/auth_controller.dart';
+import 'features/chat/data/datasource/chat_websocket_service.dart';
+import 'features/notification/presentation/controllers/notification_controller.dart';
+import 'features/network/presentation/controllers/network_controller.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -16,6 +19,10 @@ void main() async {
   // Global Bindings
   Get.put(ThemeController());
   Get.put(AuthController());
+  final chatWs = Get.put(ChatWebSocketService());
+  Get.put(NotificationController());
+  Get.put(NetworkController());
+  chatWs.connect();
 
   runApp(const LivePoisedApp());
 }

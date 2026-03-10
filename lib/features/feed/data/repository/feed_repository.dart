@@ -3,7 +3,8 @@ import '../models/post.dart';
 import '../../../../core/network/dio_client.dart';
 
 class FeedRepository {
-  final Dio _dio = DioClient().dio;
+  final Dio _dio = DioClient().springBoot;
+
 
   Future<List<Post>> getPosts({int page = 1, int limit = 20}) async {
     try {

@@ -9,10 +9,20 @@ class LoginView extends GetView<AuthController> {
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
+  void _initFields() {
+    _usernameController.text = controller.savedUsername.value;
+    _passwordController.text = controller.savedPassword.value;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+
+    // Use a listener to sync saved credentials once loaded
+    once(controller.savedUsername, (_) => _initFields());
+    // Also call once manually if already loaded
+    if (_usernameController.text.isEmpty) _initFields();
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -70,12 +80,21 @@ class LoginView extends GetView<AuthController> {
                 ),
                 const SizedBox(height: 20),
                 
-                TextField(
+                Obx(() => TextField(
                   controller: _passwordController,
-                  obscureText: true,
+                  obscureText: !controller.isPasswordVisible.value,
                   decoration: InputDecoration(
                     labelText: 'Password',
                     prefixIcon: const Icon(Icons.lock_outline),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        controller.isPasswordVisible.value
+                            ? Icons.visibility
+                            : Icons.visibility_off,
+                        color: theme.colorScheme.primary,
+                      ),
+                      onPressed: () => controller.isPasswordVisible.toggle(),
+                    ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(color: theme.colorScheme.primary, width: 2),
@@ -86,8 +105,29 @@ class LoginView extends GetView<AuthController> {
                     filled: true,
                     fillColor: isDark ? Colors.grey[900] : Colors.grey[50],
                   ),
-                ),
-                const SizedBox(height: 32),
+                )),
+                const SizedBox(height: 16),
+                
+                Obx(() => Row(
+                  children: [
+                    SizedBox(
+                      height: 24,
+                      width: 24,
+                      child: Checkbox(
+                        value: controller.rememberMe.value,
+                        onChanged: (value) => controller.rememberMe.value = value ?? false,
+                        activeColor: theme.colorScheme.primary,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: () => controller.rememberMe.value = !controller.rememberMe.value,
+                      child: const Text('Remember Me'),
+                    ),
+                  ],
+                )),
+                const SizedBox(height: 24),
                 
                 Obx(() => SizedBox(
                   width: double.infinity,

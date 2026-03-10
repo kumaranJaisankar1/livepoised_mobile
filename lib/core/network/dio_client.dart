@@ -1,17 +1,27 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import '../constants/api_endpoints.dart';
 import 'auth_interceptor.dart';
 import '../storage/secure_storage_service.dart';
 
 class DioClient {
-  late final Dio dio;
+  static final DioClient _instance = DioClient._internal();
+  factory DioClient() => _instance;
 
-  DioClient() {
-    dio = Dio(
+  late final Dio springBoot;
+  late final Dio fastAPI;
+
+  DioClient._internal() {
+    springBoot = _createDio(ApiEndpoints.baseUrlSpringBoot);
+    fastAPI = _createDio(ApiEndpoints.baseUrlFastAPI);
+  }
+
+  Dio _createDio(String baseUrl) {
+    final dio = Dio(
       BaseOptions(
-        baseUrl: dotenv.get('BASE_URL'),
-        connectTimeout: const Duration(seconds: 15),
-        receiveTimeout: const Duration(seconds: 15),
+        baseUrl: baseUrl,
+        connectTimeout: const Duration(seconds: 30),
+        receiveTimeout: const Duration(seconds: 30),
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -22,7 +32,7 @@ class DioClient {
     dio.interceptors.add(AuthInterceptor(SecureStorageService()));
     
     // Dev only logging
-    if (dotenv.get('BASE_URL').contains('dev')) {
+    if (!dotenv.get('BASE_URL_SB').contains('prod')) {
       dio.interceptors.add(LogInterceptor(
         requestHeader: true,
         requestBody: true,
@@ -31,5 +41,8 @@ class DioClient {
         error: true,
       ));
     }
+    
+    return dio;
   }
 }
+
