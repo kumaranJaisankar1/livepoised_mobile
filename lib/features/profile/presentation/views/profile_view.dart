@@ -146,7 +146,7 @@ class ProfileView extends GetView<ProfileController> {
           tooltip: 'Edit Profile',
         ),
         IconButton(
-          onPressed: () {},
+          onPressed: () => Get.toNamed('/settings'),
           icon: const Icon(Icons.settings_outlined),
           style: IconButton.styleFrom(
             backgroundColor: theme.colorScheme.surface.withOpacity(0.2),

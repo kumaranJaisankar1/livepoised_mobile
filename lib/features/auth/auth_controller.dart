@@ -5,6 +5,10 @@ import '../../core/storage/secure_storage_service.dart';
 import '../../core/models/user_model.dart';
 
 import 'package:url_launcher/url_launcher.dart';
+import 'package:get_storage/get_storage.dart';
+import '../notification/presentation/controllers/notification_controller.dart';
+import '../profile/presentation/controllers/profile_controller.dart';
+import '../network/presentation/controllers/network_controller.dart';
 
 class AuthController extends GetxController {
   final AuthService _authService = AuthService();
@@ -49,6 +53,7 @@ class AuthController extends GetxController {
       final profile = await _storage.getUserProfile();
       userProfile.value = profile;
       isLoggedIn.value = true;
+      _fetchInitialData();
       Get.offAllNamed('/');
     } else {
       isLoggedIn.value = false;
@@ -81,6 +86,7 @@ class AuthController extends GetxController {
         final profile = await _storage.getUserProfile();
         userProfile.value = profile;
         isLoggedIn.value = true;
+        _fetchInitialData();
         Get.offAllNamed('/');
       }
     } catch (e) {
@@ -106,6 +112,7 @@ class AuthController extends GetxController {
         final profile = await _storage.getUserProfile();
         userProfile.value = profile;
         isLoggedIn.value = true;
+        _fetchInitialData();
         Get.offAllNamed('/');
       } else {
         Get.snackbar('Login Cancelled', 'Browser login was not completed.');
@@ -119,11 +126,40 @@ class AuthController extends GetxController {
 
   Future<void> logout() async {
     isLoading.value = true;
-    await _authService.logout();
-    userProfile.value = null;
-    isLoggedIn.value = false;
-    isLoading.value = false;
-    Get.offAllNamed('/login');
+    try {
+      // Clear all data caches in controllers
+      if (Get.isRegistered<ProfileController>()) {
+        Get.find<ProfileController>().clearData();
+      }
+      if (Get.isRegistered<NetworkController>()) {
+        Get.find<NetworkController>().clearData();
+      }
+      if (Get.isRegistered<NotificationController>()) {
+        Get.find<NotificationController>().clearData();
+      }
+
+      await _authService.logout();
+      
+      // Clear secure storage (tokens, profile)
+      await _storage.clearAll();
+      
+      // Clear GetStorage persistence
+      final box = Get.find<GetStorage>();
+      final keys = box.getKeys();
+      for (var key in keys) {
+        if (key != 'isDarkMode') { // Keep theme preference
+           box.remove(key);
+        }
+      }
+
+      userProfile.value = null;
+      isLoggedIn.value = false;
+    } catch (e) {
+      print("Logout error: $e");
+    } finally {
+      isLoading.value = false;
+      Get.offAllNamed('/login');
+    }
   }
 
   Future<void> openRegistration() async {
@@ -148,6 +184,7 @@ class AuthController extends GetxController {
         final profile = await _storage.getUserProfile();
         userProfile.value = profile;
         checkAuthStatus(); // Refresh isLoggedIn observable
+        _fetchInitialData();
         Get.offAllNamed('/');
       } else {
         Get.snackbar('Error', 'Social login failed during token exchange');
@@ -156,6 +193,15 @@ class AuthController extends GetxController {
       Get.snackbar('Error', 'An unexpected error occurred: $e');
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  void _fetchInitialData() {
+    if (Get.isRegistered<NetworkController>()) {
+      Get.find<NetworkController>().fetchAllData();
+    }
+    if (Get.isRegistered<ProfileController>()) {
+      Get.find<ProfileController>().refreshProfile();
     }
   }
 }

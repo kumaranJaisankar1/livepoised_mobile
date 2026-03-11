@@ -107,13 +107,58 @@ class NetworkService {
 
   Future<bool> sendConnectionRequest(String username, String relationship, bool isAlly) async {
     try {
-      // For now, using the caregiver request endpoint as a general connection request
-      // We can differentiate later if the backend provides a separate mentoring request endpoint
+      if (isAlly) {
+        return await sendAllyConnectionRequest(username);
+      }
       final response = await _dio.post(ApiEndpoints.sendCaregiverRequest(username, relationship));
       return response.statusCode == 200 || response.statusCode == 201;
     } catch (e) {
       print('Error sending connection request: $e');
       return false;
+    }
+  }
+
+  Future<bool> sendAllyConnectionRequest(String mentorUsername) async {
+    try {
+      final response = await _dio.post(
+        ApiEndpoints.sendAllyRequest,
+        data: {'mentorUsername': mentorUsername},
+      );
+      return response.statusCode == 200 || response.statusCode == 201;
+    } catch (e) {
+      print('Error sending ally connection request: $e');
+      return false;
+    }
+  }
+
+  // AI Matchmaking (FastAPI)
+  Future<List<AllyMatch>> findMentors(FindAllyRequest request) async {
+    final fastapi = DioClient().fastAPI;
+    try {
+      final response = await fastapi.post(
+        ApiEndpoints.findMentors,
+        data: request.toJson(),
+      );
+      if (response.statusCode == 200) {
+        // Handle new structure: {"matches": [...], ...}
+        final Map<String, dynamic> responseData = response.data;
+        final List<dynamic> matches = responseData['matches'] ?? [];
+        return matches.map((json) => AllyMatch.fromJson(json)).toList();
+      }
+      return [];
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 422) {
+        final detail = e.response?.data['detail'];
+        if (detail is List && detail.isNotEmpty) {
+          final msg = detail[0]['msg'] ?? 'Validation error';
+          throw msg; // Throw message to be caught by controller
+        }
+      }
+      print('Error finding mentors: $e');
+      return [];
+    } catch (e) {
+      print('Error finding mentors: $e');
+      return [];
     }
   }
 

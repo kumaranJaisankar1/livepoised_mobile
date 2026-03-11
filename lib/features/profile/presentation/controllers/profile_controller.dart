@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:get_storage/get_storage.dart';
 import 'package:livepoised_mobile/features/auth/auth_controller.dart';
 import '../../data/models/profile_models.dart';
 import '../../data/services/profile_service.dart';
@@ -68,10 +69,29 @@ class ProfileController extends GetxController {
   final fitnessLevelC = "".obs;
   final availabilityHoursC = 0.obs;
 
+  final _box = Get.find<GetStorage>();
+  static const _profileCacheKey = 'profile_cache';
+  static const _userImageCacheKey = 'user_image_cache';
+  static const _connectionsCountCacheKey = 'connections_count_cache';
+
   @override
   void onInit() {
     super.onInit();
+    _loadFromCache();
     refreshProfile();
+  }
+
+  void _loadFromCache() {
+    try {
+      final cachedProfile = _box.read(_profileCacheKey);
+      if (cachedProfile != null) {
+        profileData.value = ProfileResponse.fromJson(cachedProfile);
+      }
+      userImage.value = _box.read(_userImageCacheKey) ?? "";
+      connectionsCount.value = _box.read(_connectionsCountCacheKey) ?? 0;
+    } catch (e) {
+      print("Error loading profile from cache: $e");
+    }
   }
 
   Future<void> refreshProfile() async {
@@ -79,7 +99,7 @@ class ProfileController extends GetxController {
     if (username == null) return;
     
     try {
-      isLoading(true);
+      if (profileData.value == null) isLoading(true);
       
       // Fetch core profile, image, and connections in parallel
       final results = await Future.wait([
@@ -88,9 +108,18 @@ class ProfileController extends GetxController {
         _profileService.getConnectionsCount(),
       ]);
       
-      profileData.value = results[0] as ProfileResponse;
-      userImage.value = (results[1] as Map<String, dynamic>)['image'] ?? "";
-      connectionsCount.value = results[2] as int;
+      final profile = results[0] as ProfileResponse;
+      final image = (results[1] as Map<String, dynamic>)['image'] ?? "";
+      final count = results[2] as int;
+
+      profileData.value = profile;
+      userImage.value = image;
+      connectionsCount.value = count;
+
+      // Persistence
+      _box.write(_profileCacheKey, profile.toJson());
+      _box.write(_userImageCacheKey, image);
+      _box.write(_connectionsCountCacheKey, count);
       
       // Load initial tab data
       loadTabData(activeTab.value);
@@ -99,6 +128,19 @@ class ProfileController extends GetxController {
     } finally {
       isLoading(false);
     }
+  }
+
+  void clearData() {
+    profileData.value = null;
+    userImage.value = "";
+    connectionsCount.value = 0;
+    forumContributions.clear();
+    chatSessions.clear();
+    activeTab.value = 0;
+    
+    _box.remove(_profileCacheKey);
+    _box.remove(_userImageCacheKey);
+    _box.remove(_connectionsCountCacheKey);
   }
 
   void loadTabData(int index) {

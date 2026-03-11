@@ -144,7 +144,7 @@ class LoginView extends GetView<AuthController> {
                     onPressed: controller.isLoading.value 
                       ? null 
                       : () => controller.loginInApp(
-                        _usernameController.text, 
+                        _usernameController.text.trim(), 
                         _passwordController.text
                       ),
                     child: controller.isLoading.value

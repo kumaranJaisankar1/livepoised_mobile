@@ -17,6 +17,7 @@ void main() async {
   await dotenv.load(fileName: ".env.dev");
 
   // Global Bindings
+  Get.put(GetStorage());
   Get.put(ThemeController());
   Get.put(AuthController());
   final chatWs = Get.put(ChatWebSocketService());

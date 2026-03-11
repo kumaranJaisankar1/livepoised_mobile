@@ -42,41 +42,45 @@ class RequestsView extends GetView<NetworkController> {
   Widget _buildReceivedRequestsList(ThemeData theme) {
     final incomingAllies = controller.incomingAllyRequests;
     final incomingSupporters = controller.pendingSupporterRequests;
-    
-    if (incomingAllies.isEmpty && incomingSupporters.isEmpty) {
-      return _buildEmptyState('No incoming requests', theme);
-    }
 
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        if (incomingAllies.isNotEmpty) ...[
-          _buildSectionHeader('Ally Requests', theme),
-          ...incomingAllies.map((req) => _buildRequestItem(req, theme, true)),
-        ],
-        if (incomingSupporters.isNotEmpty) ...[
-          const SizedBox(height: 24),
-          _buildSectionHeader('Support Network Invitations', theme),
-          ...incomingSupporters.map((req) => _buildRequestItem(req, theme, true)),
-        ],
-      ],
+    return RefreshIndicator(
+      onRefresh: () => controller.fetchAllData(),
+      child: (incomingAllies.isEmpty && incomingSupporters.isEmpty)
+          ? _buildEmptyState('No incoming requests', theme)
+          : ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(16),
+              children: [
+                if (incomingAllies.isNotEmpty) ...[
+                  _buildSectionHeader('Ally Requests', theme),
+                  ...incomingAllies.map((req) => _buildRequestItem(req, theme, true)),
+                ],
+                if (incomingSupporters.isNotEmpty) ...[
+                  const SizedBox(height: 24),
+                  _buildSectionHeader('Support Network Invitations', theme),
+                  ...incomingSupporters.map((req) => _buildRequestItem(req, theme, true)),
+                ],
+              ],
+            ),
     );
   }
 
   Widget _buildSentRequestsList(ThemeData theme) {
     final outgoing = controller.outgoingAllyRequests;
-    
-    if (outgoing.isEmpty) {
-      return _buildEmptyState('No outgoing requests', theme);
-    }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: outgoing.length,
-      itemBuilder: (context, index) {
-        final req = outgoing[index];
-        return _buildRequestItem(req, theme, false);
-      },
+    return RefreshIndicator(
+      onRefresh: () => controller.fetchAllData(),
+      child: outgoing.isEmpty
+          ? _buildEmptyState('No outgoing requests', theme)
+          : ListView.builder(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(16),
+              itemCount: outgoing.length,
+              itemBuilder: (context, index) {
+                final req = outgoing[index];
+                return _buildRequestItem(req, theme, false);
+              },
+            ),
     );
   }
 
@@ -94,14 +98,20 @@ class RequestsView extends GetView<NetworkController> {
   }
 
   Widget _buildEmptyState(String message, ThemeData theme) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.mail_outline, size: 64, color: theme.disabledColor),
-          const SizedBox(height: 16),
-          Text(message, style: theme.textTheme.bodyLarge),
-        ],
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      child: SizedBox(
+        height: Get.height * 0.7,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.mail_outline, size: 64, color: theme.disabledColor),
+              const SizedBox(height: 16),
+              Text(message, style: theme.textTheme.bodyLarge),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -115,7 +125,7 @@ class RequestsView extends GetView<NetworkController> {
           backgroundColor: theme.colorScheme.primaryContainer,
           foregroundImage: imageProvider,
           child: Text(
-            request.name[0].toUpperCase(),
+            request.senderUsername[0].toUpperCase(),
             style: TextStyle(
               color: theme.colorScheme.onPrimaryContainer,
               fontWeight: FontWeight.bold,
@@ -126,7 +136,7 @@ class RequestsView extends GetView<NetworkController> {
         subtitle: Text(
           request.type == 'Ally' 
               ? 'Ally Connection' 
-              : 'Support: ${request.relationship ?? "Caregiver"}'
+              : 'Support: ${request.relationship ?? "Supporter"}'
         ),
         trailing: isIncoming 
             ? Row(

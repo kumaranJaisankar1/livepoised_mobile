@@ -25,6 +25,17 @@ class ProfileResponse {
       loginDetails: json['loginDetails'] != null ? LoginDetails.fromJson(json['loginDetails']) : null,
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'userProfile': userProfile.toJson(),
+      'personalDetails': personalDetails.toJson(),
+      'address': address.toJson(),
+      'forumPostsCount': forumPostsCount,
+      'helpfulResponsesCount': helpfulResponsesCount,
+      'loginDetails': loginDetails?.toJson(),
+    };
+  }
 }
 
 class UserProfileFull {
@@ -96,6 +107,30 @@ class UserProfileFull {
           [],
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'profileId': profileId,
+      'userId': userId,
+      'userType': userType,
+      'username': username,
+      'email': email,
+      'mobileNumber': mobileNumber,
+      'phone1': phone1,
+      'phone2': phone2,
+      'firstName': firstName,
+      'middleName': middleName,
+      'lastName': lastName,
+      'suffix': suffix,
+      'prefix': prefix,
+      'gender': gender,
+      'dateOfBirth': dateOfBirth,
+      'aboutMe': aboutMe,
+      'completionPercentage': completionPercentage,
+      'onboarded': onboarded,
+      'caregivers': caregivers.map((e) => e.toJson()).toList(),
+    };
+  }
 }
 
 class Caregiver {
@@ -124,6 +159,17 @@ class Caregiver {
       linkId: json['linkId'] ?? 0,
       profileImage: json['profileImage'],
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'username': username,
+      'firstName': firstName,
+      'lastName': lastName,
+      'relationship': relationship,
+      'linkId': linkId,
+      'profileImage': profileImage,
+    };
   }
 }
 
@@ -181,6 +227,24 @@ class PersonalDetails {
       offerSupport: json['offerSupport'] ?? false,
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'injuryType': injuryType,
+      'injuryDetails': injuryDetails,
+      'yearsSinceInjury': yearsSinceInjury,
+      'yearsSinceRecovery': yearsSinceRecovery,
+      'recoveryMilestones': recoveryMilestones.map((e) => e.toJson()).toList(),
+      'achievements': achievements.map((e) => e.toJson()).toList(),
+      'personalStory': personalStory,
+      'conditionDetails': conditionDetails,
+      'stageOfRecovery': stageOfRecovery,
+      'mentorshipGoals': mentorshipGoals,
+      'fitnessLevel': fitnessLevel,
+      'availabilityHoursPerWeek': availabilityHoursPerWeek,
+      'offerSupport': offerSupport,
+    };
+  }
 }
 
 class RecoveryMilestone {
@@ -204,6 +268,15 @@ class RecoveryMilestone {
       date: json['date'] ?? '',
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'type': type,
+      'date': date,
+    };
+  }
 }
 
 class Achievement {
@@ -223,6 +296,14 @@ class Achievement {
       title: json['title'] ?? '',
       month: json['month'] ?? '',
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'month': month,
+    };
   }
 }
 
@@ -252,6 +333,17 @@ class Address {
       country: json['country'] ?? '',
       postalCode: json['postalCode'] ?? '',
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'addressLine1': addressLine1,
+      'addressLine2': addressLine2,
+      'city': city,
+      'state': state,
+      'country': country,
+      'postalCode': postalCode,
+    };
   }
 }
 
@@ -327,6 +419,14 @@ class LoginDetails {
       lastLoggedInAt: json['lastLoggedInAt'],
       loggedIn: json['loggedIn'] ?? false,
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'createdAt': createdAt,
+      'lastLoggedInAt': lastLoggedInAt,
+      'loggedIn': loggedIn,
+    };
   }
 }
 

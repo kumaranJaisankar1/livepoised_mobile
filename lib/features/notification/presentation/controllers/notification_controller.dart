@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:get/get.dart';
+import 'package:get_storage/get_storage.dart';
 import '../../data/models/notification_model.dart';
 import '../../data/services/notification_service.dart';
 
@@ -10,14 +11,36 @@ class NotificationController extends GetxController {
   final notifications = <NotificationModel>[].obs;
   final unreadCount = 0.obs;
   final isLoading = false.obs;
+  final isNotificationsEnabled = true.obs;
   
+  final _box = Get.find<GetStorage>();
+  final _key = 'isNotificationsEnabled';
   Timer? _pollingTimer;
 
   @override
   void onInit() {
     super.onInit();
-    fetchNotifications();
-    startPolling();
+    _loadSettings();
+    if (isNotificationsEnabled.value) {
+      fetchNotifications();
+      startPolling();
+    }
+  }
+
+  void _loadSettings() {
+    isNotificationsEnabled.value = _box.read(_key) ?? true;
+  }
+
+  void toggleNotifications(bool value) {
+    isNotificationsEnabled.value = value;
+    _box.write(_key, value);
+    if (value) {
+      fetchNotifications();
+      startPolling();
+    } else {
+      _pollingTimer?.cancel();
+      unreadCount.value = 0;
+    }
   }
 
   @override
@@ -28,10 +51,12 @@ class NotificationController extends GetxController {
 
   void startPolling() {
     _pollingTimer?.cancel();
+    if (!isNotificationsEnabled.value) return;
     _pollingTimer = Timer.periodic(const Duration(seconds: 30), (_) => fetchNotifications(silent: true));
   }
 
   Future<void> fetchNotifications({bool silent = false}) async {
+    if (!isNotificationsEnabled.value) return;
     if (!silent) isLoading.value = true;
     try {
       final all = await _service.getAllNotifications();
@@ -42,6 +67,12 @@ class NotificationController extends GetxController {
     } finally {
       if (!silent) isLoading.value = false;
     }
+  }
+
+  void clearData() {
+    notifications.clear();
+    unreadCount.value = 0;
+    _pollingTimer?.cancel();
   }
 
   Future<void> markAsRead(int id) async {

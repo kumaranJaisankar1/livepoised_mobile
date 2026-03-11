@@ -38,6 +38,7 @@ class NetworkRequest with _$NetworkRequest {
     @JsonKey(name: 'username') String? username, // For Supporter requests
     @JsonKey(name: 'firstName') String? firstName,
     @JsonKey(name: 'lastName') String? lastName,
+    @JsonKey(name: 'preferredName') String? preferredName,
     @JsonKey(name: 'profileImage') String? senderImageUrl,
     required String type, // "Ally" or "Supporter"
     String? relationship,
@@ -48,6 +49,9 @@ class NetworkRequest with _$NetworkRequest {
   String get senderUsername => username ?? mentorUsername ?? menteeUsername ?? 'Unknown';
   
   String get name {
+    if (preferredName != null && preferredName!.isNotEmpty) {
+      return preferredName!;
+    }
     if (firstName != null || lastName != null) {
       return '${firstName ?? ''} ${lastName ?? ''}'.trim();
     }
@@ -55,4 +59,38 @@ class NetworkRequest with _$NetworkRequest {
   }
 
   factory NetworkRequest.fromJson(Map<String, dynamic> json) => _$NetworkRequestFromJson(json);
+}
+
+@freezed
+class FindAllyRequest with _$FindAllyRequest {
+  const factory FindAllyRequest({
+    @JsonKey(name: 'user_id') required dynamic userId,
+    required String username,
+    required String query,
+    @JsonKey(name: 'conditions') @Default('') String condition,
+    @JsonKey(name: 'preferred_country') @Default('') String preferredCountry,
+    @JsonKey(name: 'preferred_languages') @Default([]) List<String> preferredLanguages,
+    @JsonKey(name: 'min_experience_years') @Default(0) int minExperienceYears,
+    @JsonKey(name: 'live_experience_tags') @Default([]) List<String> liveExperienceTags,
+    @JsonKey(name: 'offer_support', includeIfNull: false) bool? offerSupport,
+    @JsonKey(name: 'top_k') @Default(5) int topK,
+  }) = _FindAllyRequest;
+
+  factory FindAllyRequest.fromJson(Map<String, dynamic> json) => _$FindAllyRequestFromJson(json);
+}
+
+@freezed
+class AllyMatch with _$AllyMatch {
+  const factory AllyMatch({
+    @JsonKey(name: 'user_id') required int userId,
+    required String username,
+    @JsonKey(name: 'full_name') required String fullName,
+    @JsonKey(name: 'match_confidence') required int matchConfidence,
+    @JsonKey(name: 'connection_status') String? connectionStatus,
+    @JsonKey(name: 'about_me') String? aboutMe,
+    @JsonKey(name: 'profile_image_url') String? profileImageUrl,
+    @JsonKey(name: 'live_experience_tags') List<String>? liveExperienceTags,
+  }) = _AllyMatch;
+
+  factory AllyMatch.fromJson(Map<String, dynamic> json) => _$AllyMatchFromJson(json);
 }

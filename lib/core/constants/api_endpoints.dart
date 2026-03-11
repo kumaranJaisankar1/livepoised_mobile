@@ -51,8 +51,12 @@ class ApiEndpoints {
   // Ally Network Requests (Spring Boot)
   static String get incomingAllyRequests => '$baseUrlSpringBoot/api/allies/requests/received';
   static String get outgoingAllyRequests => '$baseUrlSpringBoot/api/allies/requests/sent';
+  static String get sendAllyRequest => '$baseUrlSpringBoot/api/allies/requests'; // Unified POST endpoint
   static String acceptAllyRequest(dynamic id) => '$baseUrlSpringBoot/api/allies/requests/$id/accept';
   static String rejectAllyRequest(dynamic id) => '$baseUrlSpringBoot/api/allies/requests/$id/reject';
+
+  // AI Matchmaking (FastAPI)
+  static String get findMentors => '$baseUrlFastAPI/api/matchmaking/find-mentors';
 
   // Caregiver / Support Network (Spring Boot)
   static String searchCaregivers(String query) => '$baseUrlSpringBoot/api/care-network/search?query=$query';

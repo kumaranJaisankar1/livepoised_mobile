@@ -145,16 +145,19 @@ class _CustomLinkPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isVideo = _isVideoLink(url);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
 
     return AnyLinkPreview.builder(
       link: url,
       placeholderWidget: Container(
         height: 200,
         decoration: BoxDecoration(
-          color: Colors.grey[900],
+          color: colorScheme.surfaceVariant.withOpacity(0.5),
           borderRadius: BorderRadius.circular(16),
         ),
-        child: const Center(child: CircularProgressIndicator()),
+        child: Center(child: CircularProgressIndicator(color: colorScheme.primary)),
       ),
       errorWidget: const SizedBox.shrink(),
       itemBuilder: (context, metadata, imageProvider, _) {
@@ -175,11 +178,11 @@ class _CustomLinkPreview extends StatelessWidget {
                       BackdropFilter(
                         filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                         child: Container(
-                          color: Colors.black.withOpacity(0.3),
+                          color: (isDark ? Colors.black : Colors.white).withOpacity(0.2),
                         ),
                       ),
                     ] else
-                      Container(color: Colors.black87),
+                      Container(color: colorScheme.surfaceVariant),
 
                     // Centered contain image
                     if (imageProvider != null)
@@ -191,9 +194,9 @@ class _CustomLinkPreview extends StatelessWidget {
                         child: Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
+                            color: Colors.black.withOpacity(0.4),
                             shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white.withOpacity(0.3), width: 1.5),
+                            border: Border.all(color: Colors.white.withOpacity(0.5), width: 1.5),
                           ),
                           child: const Icon(
                             Icons.play_arrow_rounded,
@@ -209,17 +212,15 @@ class _CustomLinkPreview extends StatelessWidget {
               // Title & Description Bar
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                color: const Color(0xFF032D28),
+                color: isDark ? colorScheme.surfaceVariant : colorScheme.primaryContainer.withOpacity(0.1),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       metadata.title ?? '',
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                        fontFamily: 'Inter',
+                        color: colorScheme.onSurfaceVariant,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -228,10 +229,8 @@ class _CustomLinkPreview extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         metadata.desc!,
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.7),
-                          fontSize: 12,
-                          fontFamily: 'Inter',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant.withOpacity(0.7),
                         ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,

@@ -20,6 +20,7 @@ import '../features/auth/presentation/views/splash_view.dart';
 import '../presentation/layouts/main_layout.dart';
 import '../features/profile/presentation/controllers/profile_controller.dart';
 import '../features/profile/presentation/views/edit_profile_view.dart';
+import '../features/profile/presentation/views/settings_view.dart';
 import '../features/network/presentation/controllers/network_controller.dart';
 
 class AppPages {
@@ -101,6 +102,11 @@ class AppPages {
     GetPage(
       name: '/edit-profile',
       page: () => const EditProfileView(),
+      middlewares: [AuthMiddleware()],
+    ),
+    GetPage(
+      name: '/settings',
+      page: () => const SettingsView(),
       middlewares: [AuthMiddleware()],
     ),
   ];
