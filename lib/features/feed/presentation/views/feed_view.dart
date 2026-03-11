@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:flutter/rendering.dart';
 import 'package:livepoised_mobile/features/auth/auth_controller.dart';
 import 'package:livepoised_mobile/features/notification/presentation/controllers/notification_controller.dart';
 import '../controllers/feed_controller.dart';
@@ -68,6 +69,7 @@ class FeedView extends GetView<FeedController> {
         return RefreshIndicator(
           onRefresh: () => controller.fetchPosts(refresh: true),
           child: ListView.separated(
+            controller: controller.scrollController,
             padding: const EdgeInsets.symmetric(vertical: 12),
             itemCount:
                 controller.posts.length +
@@ -91,6 +93,19 @@ class FeedView extends GetView<FeedController> {
           ),
         );
       }),
+      floatingActionButton: Obx(() => AnimatedScale(
+        scale: controller.isFabVisible.value ? 1.0 : 0.0,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeInOut,
+        child: FloatingActionButton.extended(
+          onPressed: () => Get.toNamed('/neuro-wellness'),
+          backgroundColor: Theme.of(context).colorScheme.primary,
+          foregroundColor: Colors.white,
+          icon: const Icon(Icons.psychology, size: 24),
+          label: const Text("Neuro", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+          elevation: 4,
+        ),
+      )),
     ),
    );
   }

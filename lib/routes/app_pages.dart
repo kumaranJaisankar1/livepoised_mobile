@@ -22,6 +22,9 @@ import '../features/profile/presentation/controllers/profile_controller.dart';
 import '../features/profile/presentation/views/edit_profile_view.dart';
 import '../features/profile/presentation/views/settings_view.dart';
 import '../features/network/presentation/controllers/network_controller.dart';
+import '../features/neuro_wellness/presentation/views/neuro_wellness_lobby_view.dart';
+import '../features/neuro_wellness/presentation/controllers/neuro_wellness_controller.dart';
+import '../features/neuro_wellness/presentation/views/memory_recall_game_view.dart';
 
 class AppPages {
   static const initial = '/splash';
@@ -57,6 +60,7 @@ class AppPages {
         Get.lazyPut(() => FeedController());
         Get.lazyPut(() => ProfileController());
         Get.lazyPut(() => ChatListController());
+        Get.lazyPut(() => NeuroWellnessController());
       }),
     ),
     GetPage(
@@ -107,6 +111,19 @@ class AppPages {
     GetPage(
       name: '/settings',
       page: () => const SettingsView(),
+      middlewares: [AuthMiddleware()],
+    ),
+    GetPage(
+      name: '/neuro-wellness',
+      page: () => const NeuroWellnessLobbyView(),
+      middlewares: [AuthMiddleware()],
+      binding: BindingsBuilder(() {
+        Get.lazyPut(() => NeuroWellnessController());
+      }),
+    ),
+    GetPage(
+      name: '/neuro-wellness/memory-recall',
+      page: () => const MemoryRecallGameView(),
       middlewares: [AuthMiddleware()],
     ),
   ];

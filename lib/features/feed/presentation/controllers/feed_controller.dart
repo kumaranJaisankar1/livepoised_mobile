@@ -1,3 +1,5 @@
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/rendering.dart';
 import 'package:get/get.dart';
 import '../../data/models/post.dart';
 import '../../data/repository/feed_repository.dart';
@@ -13,6 +15,9 @@ class FeedController extends GetxController {
   final isLoading = false.obs;
   final isMoreLoading = false.obs;
   final selectedTab = 0.obs; // 0 for Trending, 1 for Latest
+  
+  final scrollController = ScrollController();
+  final isFabVisible = true.obs;
 
   Post _updatePostLikeStatus(Post post) {
     final username = _authController.userProfile.value?.username;
@@ -25,6 +30,20 @@ class FeedController extends GetxController {
   void onInit() {
     super.onInit();
     fetchPosts();
+    
+    scrollController.addListener(() {
+      if (scrollController.position.userScrollDirection == ScrollDirection.reverse) {
+        if (isFabVisible.value) isFabVisible.value = false;
+      } else if (scrollController.position.userScrollDirection == ScrollDirection.forward) {
+        if (!isFabVisible.value) isFabVisible.value = true;
+      }
+    });
+  }
+
+  @override
+  void onClose() {
+    scrollController.dispose();
+    super.onClose();
   }
 
   Future<void> fetchPosts({bool refresh = false}) async {

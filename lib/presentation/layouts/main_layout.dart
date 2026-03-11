@@ -4,6 +4,7 @@ import 'package:livepoised_mobile/features/chat/presentation/views/conversation_
 import 'package:livepoised_mobile/features/network/presentation/views/my_network_view.dart';
 import 'package:livepoised_mobile/features/feed/presentation/views/feed_view.dart';
 import 'package:livepoised_mobile/features/profile/presentation/views/profile_view.dart';
+import 'package:livepoised_mobile/features/neuro_wellness/presentation/views/neuro_wellness_lobby_view.dart';
 
 import 'package:livepoised_mobile/features/network/presentation/controllers/network_controller.dart';
 
