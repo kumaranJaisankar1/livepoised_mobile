@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../../chat/data/models/chat_connection.dart';
 import '../controllers/network_controller.dart';
 import '../../data/models/network_models.dart';
 import 'package:livepoised_mobile/core/utils/image_utils.dart';
@@ -186,60 +187,125 @@ class MyNetworkView extends GetView<NetworkController> {
             )
           : ListView.builder(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               itemCount: connections.length,
               itemBuilder: (context, index) {
-        final conn = connections[index];
-        final imageProvider = ImageUtils.getImageProvider(conn.imageUrl);
-        
-        return Card(
-          elevation: 0,
-          color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
-          margin: const EdgeInsets.only(bottom: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: theme.colorScheme.outlineVariant.withOpacity(0.5)),
-          ),
-          child: ListTile(
-            contentPadding: const EdgeInsets.all(8),
-            leading: CircleAvatar(
-              radius: 28,
-              backgroundColor: theme.colorScheme.primaryContainer,
-              foregroundImage: imageProvider,
-              child: Text(
-                conn.name[0].toUpperCase(),
-                style: TextStyle(
-                  color: theme.colorScheme.onPrimaryContainer,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            title: Text(
-              conn.name,
-              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            subtitle: Padding(
-              padding: const EdgeInsets.only(top: 4.0),
-              child: Text(
-                conn.relationship ?? (conn.isSupport ? 'Supporter' : 'Ally'),
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-            trailing: OutlinedButton(
-              onPressed: () {
-                Get.toNamed('/chat-history', arguments: {'username': conn.username, 'name': conn.name});
+                final conn = connections[index];
+                final imageProvider = ImageUtils.getImageProvider(conn.imageUrl);
+                final isDark = theme.brightness == Brightness.dark;
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: isDark ? Colors.black.withOpacity(0.3) : Colors.black.withOpacity(0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () {
+                          // Optional: Navigate to user profile
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Row(
+                            children: [
+                              // Premium Avatar with subtle ring
+                              Container(
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: theme.colorScheme.primary.withOpacity(0.1),
+                                    width: 3,
+                                  ),
+                                ),
+                                child: CircleAvatar(
+                                  radius: 30,
+                                  backgroundColor: theme.colorScheme.primaryContainer,
+                                  foregroundImage: imageProvider,
+                                  child: Text(
+                                    conn.name.isNotEmpty ? conn.name[0].toUpperCase() : '?',
+                                    style: TextStyle(
+                                      color: theme.colorScheme.onPrimaryContainer,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 18,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              // User Info
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      conn.name,
+                                      style: theme.textTheme.titleMedium?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        color: theme.colorScheme.onSurface,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        // Relationship Badge
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: theme.colorScheme.secondaryContainer.withOpacity(0.5),
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: Text(
+                                            conn.relationship ?? (conn.isSupport ? 'Supporter' : 'Ally'),
+                                            style: theme.textTheme.labelSmall?.copyWith(
+                                              color: theme.colorScheme.onSecondaryContainer,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              // Message Action
+                              IconButton.filledTonal(
+                                onPressed: () {
+                                  Get.toNamed('/chat-history', arguments: ChatConnection(
+                                    username: conn.username,
+                                    firstName: conn.firstName,
+                                    lastName: conn.lastName,
+                                    profileImage: conn.imageUrl,
+                                    connectionType: conn.connectionType,
+                                    relationship: conn.relationship,
+                                  ));
+                                },
+                                icon: const Icon(Icons.chat_bubble_outline_rounded, size: 20),
+                                tooltip: 'Message',
+                                style: IconButton.styleFrom(
+                                  backgroundColor: theme.colorScheme.primaryContainer.withOpacity(0.4),
+                                  foregroundColor: theme.colorScheme.primary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
               },
-              style: OutlinedButton.styleFrom(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              ),
-              child: const Text('Message'),
             ),
-          ),
-        );
-      },
-    ),
-  );
-}
+    );
+  }
 }

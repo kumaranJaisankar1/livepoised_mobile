@@ -14,43 +14,129 @@ class EditProfileView extends GetView<ProfileController> {
     Get.put(CaregiverController());
     controller.initEditForm();
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return DefaultTabController(
       length: 5,
       child: Scaffold(
+        extendBodyBehindAppBar: true,
         appBar: AppBar(
-          title: const Text("Edit Profile", style: TextStyle(fontWeight: FontWeight.bold)),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          flexibleSpace: ClipRect(
+            child: Container(
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface.withOpacity(0.8),
+              ),
+            ),
+          ),
+          title: Text(
+            "Edit Profile", 
+            style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900, letterSpacing: -0.5)
+          ),
           actions: [
-            TextButton(
-              onPressed: () => controller.saveProfile(),
-              child: const Text("Save", style: TextStyle(fontWeight: FontWeight.bold)),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+              child: ElevatedButton(
+                onPressed: () => controller.saveProfile(),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: theme.colorScheme.primary,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                ),
+                child: const Text("Save", style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
             ),
           ],
-          bottom: const TabBar(
-            isScrollable: true,
-            tabs: [
-              Tab(text: "Personal"),
-              Tab(text: "Contact"),
-              Tab(text: "Health & Recovery"),
-              Tab(text: "Supporters"),
-              Tab(text: "Mentorship"),
-            ],
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(60),
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
+                borderRadius: BorderRadius.circular(30),
+              ),
+              child: TabBar(
+                isScrollable: true,
+                indicatorSize: TabBarIndicatorSize.tab,
+                indicator: BoxDecoration(
+                  borderRadius: BorderRadius.circular(25),
+                  color: theme.colorScheme.primary,
+                  boxShadow: [
+                    BoxShadow(
+                      color: theme.colorScheme.primary.withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                labelColor: Colors.white,
+                unselectedLabelColor: theme.colorScheme.onSurfaceVariant,
+                labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
+                dividerColor: Colors.transparent,
+                tabs: const [
+                  Tab(text: "Personal"),
+                  Tab(text: "Contact"),
+                  Tab(text: "Health"),
+                  Tab(text: "Supporters"),
+                  Tab(text: "Mentorship"),
+                ],
+              ),
+            ),
           ),
         ),
         body: Stack(
           children: [
-            const TabBarView(
-              children: [
-                _PersonalTab(),
-                _ContactTab(),
-                _HealthTab(),
-                _SupportersTab(),
-                _MentorshipTab(),
-              ],
+            // Premium Background Gradient
+            Positioned.fill(
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: isDark 
+                      ? [
+                          theme.colorScheme.surface,
+                          theme.colorScheme.surface.withBlue(20),
+                        ]
+                      : [
+                          Colors.white,
+                          const Color(0xFFF1F5F9), // Very light cool grey
+                        ],
+                  ),
+                ),
+              ),
+            ),
+            // Pattern Overlay
+            Positioned.fill(
+              child: Opacity(
+                opacity: isDark ? 0.02 : 0.03, // Extra subtle
+                child: Image.asset(
+                  'assets/images/logo.png', 
+                  repeat: ImageRepeat.repeat,
+                  scale: 16, // Smaller pattern
+                ),
+              ),
+            ),
+            Padding(
+              padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top + 130),
+              child: const TabBarView(
+                children: [
+                  _PersonalTab(),
+                  _ContactTab(),
+                  _HealthTab(),
+                  _SupportersTab(),
+                  _MentorshipTab(),
+                ],
+              ),
             ),
             Obx(() => controller.isSaving.value
                 ? Container(
-                    color: Colors.black26,
+                    color: Colors.black45,
                     child: const Center(child: CircularProgressIndicator()),
                   )
                 : const SizedBox.shrink()),
@@ -66,44 +152,56 @@ class _PersonalTab extends GetView<ProfileController> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         children: [
-          _buildTextField("Username", controller.usernameC, readOnly: true),
-          const SizedBox(height: 16),
-          _buildTextField("First Name", controller.firstNameC),
-          const SizedBox(height: 16),
-          _buildTextField("Middle Name", controller.middleNameC),
-          const SizedBox(height: 16),
-          _buildTextField("Last Name", controller.lastNameC),
-          const SizedBox(height: 16),
+          _buildTextField("Username", controller.usernameC, icon: Icons.person_outline, readOnly: true),
+          const SizedBox(height: 12),
+          _buildTextField("First Name", controller.firstNameC, icon: Icons.badge_outlined),
+          const SizedBox(height: 12),
+          _buildTextField("Middle Name", controller.middleNameC, icon: Icons.badge_outlined),
+          const SizedBox(height: 12),
+          _buildTextField("Last Name", controller.lastNameC, icon: Icons.badge_outlined),
+          const SizedBox(height: 12),
           Row(
             children: [
-              Expanded(child: _buildTextField("Prefix", controller.prefixC)),
+              Expanded(child: _buildTextField("Prefix", controller.prefixC, icon: Icons.text_fields)),
               const SizedBox(width: 16),
-              Expanded(child: _buildTextField("Suffix", controller.suffixC)),
+              Expanded(child: _buildTextField("Suffix", controller.suffixC, icon: Icons.text_fields)),
             ],
           ),
-          const SizedBox(height: 16),
-          _buildDropdown("Gender", controller.genderC, ["Male", "Female", "Other"]),
-          const SizedBox(height: 16),
-          Obx(() => ListTile(
-                title: const Text("Date of Birth"),
-                subtitle: Text(controller.dobC.value == null
-                    ? "Not set"
-                    : DateFormat('yyyy-MM-dd').format(controller.dobC.value!)),
-                trailing: const Icon(Icons.calendar_today),
-                onTap: () async {
-                  final picked = await showDatePicker(
-                    context: context,
-                    initialDate: controller.dobC.value ?? DateTime.now(),
-                    firstDate: DateTime(1900),
-                    lastDate: DateTime.now(),
-                  );
-                  if (picked != null) controller.dobC.value = picked;
-                },
-              )),
+          const SizedBox(height: 12),
+          _buildDropdown("Gender", controller.genderC, ["Male", "Female", "Other"], icon: Icons.wc_outlined),
+          const SizedBox(height: 20),
+          Obx(() => Container(
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: ListTile(
+              leading: Icon(Icons.calendar_today_outlined, color: theme.colorScheme.primary),
+              title: Text("Date of Birth", style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.primary.withOpacity(0.8), fontWeight: FontWeight.bold)),
+              subtitle: Text(controller.dobC.value == null
+                  ? "Not set"
+                  : DateFormat('MMMM dd, yyyy').format(controller.dobC.value!),
+                  style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500)),
+              trailing: const Icon(Icons.edit_calendar_outlined, size: 20),
+              onTap: () async {
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: controller.dobC.value ?? DateTime.now(),
+                  firstDate: DateTime(1900),
+                  lastDate: DateTime.now(),
+                  builder: (context, child) {
+                    return Theme(data: theme, child: child!);
+                  }
+                );
+                if (picked != null) controller.dobC.value = picked;
+              },
+            ),
+          )),
         ],
       ),
     );
@@ -119,35 +217,42 @@ class _ContactTab extends GetView<ProfileController> {
       padding: const EdgeInsets.all(20),
       child: Column(
         children: [
-          _buildTextField("Email", controller.emailC, keyboardType: TextInputType.emailAddress),
-          const SizedBox(height: 16),
-          _buildTextField("Mobile Number", controller.mobileNumberC),
-          const SizedBox(height: 16),
-          _buildTextField("Secondary Phone 1", controller.phone1C),
-          const SizedBox(height: 16),
-          _buildTextField("Secondary Phone 2", controller.phone2C),
-          const SizedBox(height: 24),
-          const Text("Address", style: TextStyle(fontWeight: FontWeight.bold)),
+          _buildTextField("Email", controller.emailC, icon: Icons.email_outlined, keyboardType: TextInputType.emailAddress),
           const SizedBox(height: 12),
-          _buildTextField("Address Line 1", controller.addressLine1C),
-          const SizedBox(height: 16),
-          _buildTextField("Address Line 2", controller.addressLine2C),
-          const SizedBox(height: 16),
+          _buildTextField("Mobile Number", controller.mobileNumberC, icon: Icons.phone_android_outlined),
+          const SizedBox(height: 12),
+          _buildTextField("Secondary Phone 1", controller.phone1C, icon: Icons.phone_outlined),
+          const SizedBox(height: 12),
+          _buildTextField("Secondary Phone 2", controller.phone2C, icon: Icons.phone_outlined),
+          const SizedBox(height: 32),
           Row(
             children: [
-              Expanded(child: _buildTextField("City", controller.cityC)),
+              Icon(Icons.home_outlined, size: 18, color: Get.theme.colorScheme.primary),
+              const SizedBox(width: 8),
+              Text("OFFICIAL ADDRESS", style: Get.theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.bold, letterSpacing: 1.2, color: Get.theme.colorScheme.primary)),
+            ],
+          ),
+          const Divider(height: 24),
+          _buildTextField("Address Line 1", controller.addressLine1C, icon: Icons.location_on_outlined),
+          const SizedBox(height: 12),
+          _buildTextField("Address Line 2", controller.addressLine2C, icon: Icons.location_city_outlined),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(child: _buildTextField("City", controller.cityC, icon: Icons.map_outlined)),
               const SizedBox(width: 16),
-              Expanded(child: _buildTextField("State", controller.stateC)),
+              Expanded(child: _buildTextField("State", controller.stateC, icon: Icons.explore_outlined)),
             ],
           ),
           const SizedBox(height: 16),
           Row(
             children: [
-              Expanded(child: _buildTextField("Country", controller.countryC)),
+              Expanded(child: _buildTextField("Country", controller.countryC, icon: Icons.public)),
               const SizedBox(width: 16),
-              Expanded(child: _buildTextField("Postal Code", controller.postalCodeC)),
+              Expanded(child: _buildTextField("Postal Code", controller.postalCodeC, icon: Icons.pin_drop_outlined)),
             ],
           ),
+          const SizedBox(height: 120), // Bottom buffer
         ],
       ),
     );
@@ -164,25 +269,25 @@ class _HealthTab extends GetView<ProfileController> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildTextField("About Me", controller.aboutMeC, maxLines: 3),
-          const SizedBox(height: 16),
-          _buildTextField("Injury Type", controller.injuryTypeC),
-          const SizedBox(height: 16),
-          _buildTextField("Injury Details", controller.injuryDetailsC, maxLines: 3),
-          const SizedBox(height: 16),
+          _buildTextField("About Me", controller.aboutMeC, icon: Icons.person_pin_outlined, maxLines: 3),
+          const SizedBox(height: 12),
+          _buildTextField("Injury Type", controller.injuryTypeC, icon: Icons.medical_information_outlined),
+          const SizedBox(height: 12),
+          _buildTextField("Injury Details", controller.injuryDetailsC, icon: Icons.description_outlined, maxLines: 3),
+          const SizedBox(height: 12),
           Row(
             children: [
-              Expanded(child: _buildNumberField("Years Since Injury", controller.yearsSinceInjuryC)),
+              Expanded(child: _buildNumberField("Years Since Injury", controller.yearsSinceInjuryC, icon: Icons.calendar_today_outlined)),
               const SizedBox(width: 16),
-              Expanded(child: _buildNumberField("Years Since Recovery", controller.yearsSinceRecoveryC)),
+              Expanded(child: _buildNumberField("Years Since Recovery", controller.yearsSinceRecoveryC, icon: Icons.auto_graph_outlined)),
             ],
           ),
-          const SizedBox(height: 16),
-          _buildTextField("Personal Story", controller.personalStoryC, maxLines: 4),
-          const SizedBox(height: 16),
-          _buildTextField("Condition Details", controller.conditionDetailsC, maxLines: 3),
-          const SizedBox(height: 16),
-          _buildTextField("Stage of Recovery", controller.stageOfRecoveryC),
+          const SizedBox(height: 12),
+          _buildTextField("Personal Story", controller.personalStoryC, icon: Icons.history_edu_outlined, maxLines: 4),
+          const SizedBox(height: 12),
+          _buildTextField("Condition Details", controller.conditionDetailsC, icon: Icons.list_alt_outlined, maxLines: 3),
+          const SizedBox(height: 12),
+          _buildTextField("Stage of Recovery", controller.stageOfRecoveryC, icon: Icons.speed_outlined),
           const SizedBox(height: 24),
           
           _buildDynamicList(
@@ -204,7 +309,7 @@ class _HealthTab extends GetView<ProfileController> {
             itemBuilder: (a) => Text("${a.title} (${a.month})"),
           ),
           
-          const SizedBox(height: 80), // Prevent hiding by navbar
+          const SizedBox(height: 120), // Prevent hiding by navbar
         ],
       ),
     );
@@ -237,14 +342,23 @@ class _HealthTab extends GetView<ProfileController> {
             : ListView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
+                padding: EdgeInsets.zero,
                 itemCount: items.length,
                 itemBuilder: (context, index) {
-                  return Card(
+                  return Container(
                     margin: const EdgeInsets.only(bottom: 8),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
                     child: ListTile(
-                      title: itemBuilder(items[index]),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                      title: DefaultTextStyle(
+                        style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600) ?? const TextStyle(),
+                        child: itemBuilder(items[index]),
+                      ),
                       trailing: IconButton(
-                        icon: const Icon(Icons.delete_outline, color: Colors.red),
+                        icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
                         onPressed: () => onRemove(index),
                       ),
                     ),
@@ -354,15 +468,31 @@ class _SupportersTab extends GetView<CaregiverController> {
             const SizedBox(height: 12),
             TextField(
               onChanged: (val) => controller.searchQuery.value = val,
+              style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
               decoration: InputDecoration(
                 hintText: "Search by username...",
+                hintStyle: TextStyle(color: theme.hintColor),
                 suffixIcon: Obx(() => controller.isSearching.value 
                   ? const Padding(
                       padding: EdgeInsets.all(12.0),
                       child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
                     )
-                  : const Icon(Icons.search)),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  : Icon(Icons.search, color: theme.colorScheme.primary)),
+                filled: true,
+                fillColor: theme.colorScheme.surfaceVariant.withOpacity(0.25),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.5),
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               ),
             ),
             
@@ -392,7 +522,7 @@ class _SupportersTab extends GetView<CaregiverController> {
             else
               ...controller.allies.map((ally) => _buildAllyCard(context, ally)).toList(),
             
-            const SizedBox(height: 80), // Spacer for nav bar
+            const SizedBox(height: 120), // Spacer for nav bar
           ],
         ),
       );
@@ -401,8 +531,12 @@ class _SupportersTab extends GetView<CaregiverController> {
 
   Widget _buildUserCard(BuildContext context, LinkedUserDTO user) {
     final theme = Theme.of(context);
-    return Card(
-      margin: const EdgeInsets.only(top: 8),
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(16),
+      ),
       child: ListTile(
         leading: CircleAvatar(
           backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
@@ -413,10 +547,16 @@ class _SupportersTab extends GetView<CaregiverController> {
               ? Text(user.firstName.isNotEmpty ? user.firstName[0].toUpperCase() : "?")
               : null,
         ),
-        title: Text("${user.firstName} ${user.lastName}"),
+        title: Text("${user.firstName} ${user.lastName}", style: const TextStyle(fontWeight: FontWeight.bold)),
         subtitle: Text("@${user.username}\n${user.country ?? ''}"),
         trailing: ElevatedButton(
           onPressed: () => _showRequestDialog(context, user),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: theme.colorScheme.primary,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            visualDensity: VisualDensity.compact,
+          ),
           child: const Text("Request"),
         ),
       ),
@@ -427,31 +567,39 @@ class _SupportersTab extends GetView<CaregiverController> {
     final theme = Theme.of(context);
     return Card(
       margin: const EdgeInsets.only(top: 8),
-      color: Colors.orange.withOpacity(0.05),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
-          backgroundImage: req.profileImage != null && req.profileImage!.isNotEmpty
-              ? MemoryImage(base64Decode(req.profileImage!.split(',').last))
-              : null,
-          child: req.profileImage == null || req.profileImage!.isEmpty
-              ? Text(req.firstName.isNotEmpty ? req.firstName[0].toUpperCase() : "?")
-              : null,
+      color: Colors.transparent,
+      elevation: 0,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.orange.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.orange.withOpacity(0.2)),
         ),
-        title: Text("${req.firstName} ${req.lastName}"),
-        subtitle: Text("Relationship: ${req.relationship}"),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              icon: const Icon(Icons.check_circle, color: Colors.green),
-              onPressed: () => controller.respondToReq(req.linkId, true),
-            ),
-            IconButton(
-              icon: const Icon(Icons.cancel, color: Colors.red),
-              onPressed: () => controller.respondToReq(req.linkId, false),
-            ),
-          ],
+        child: ListTile(
+          leading: CircleAvatar(
+            backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
+            backgroundImage: req.profileImage != null && req.profileImage!.isNotEmpty
+                ? MemoryImage(base64Decode(req.profileImage!.split(',').last))
+                : null,
+            child: req.profileImage == null || req.profileImage!.isEmpty
+                ? Text(req.firstName.isNotEmpty ? req.firstName[0].toUpperCase() : "?")
+                : null,
+          ),
+          title: Text("${req.firstName} ${req.lastName}", style: const TextStyle(fontWeight: FontWeight.bold)),
+          subtitle: Text("Relationship: ${req.relationship}"),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.check_circle, color: Colors.green),
+                onPressed: () => controller.respondToReq(req.linkId, true),
+              ),
+              IconButton(
+                icon: const Icon(Icons.cancel, color: Colors.red),
+                onPressed: () => controller.respondToReq(req.linkId, false),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -459,8 +607,12 @@ class _SupportersTab extends GetView<CaregiverController> {
 
   Widget _buildAllyCard(BuildContext context, Caregiver ally) {
     final theme = Theme.of(context);
-    return Card(
-      margin: const EdgeInsets.only(top: 8),
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(16),
+      ),
       child: ListTile(
         leading: CircleAvatar(
           backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
@@ -471,7 +623,7 @@ class _SupportersTab extends GetView<CaregiverController> {
               ? Text(ally.firstName.isNotEmpty ? ally.firstName[0].toUpperCase() : "?")
               : null,
         ),
-        title: Text("${ally.firstName} ${ally.lastName}"),
+        title: Text("${ally.firstName} ${ally.lastName}", style: const TextStyle(fontWeight: FontWeight.bold)),
         subtitle: Text("Relationship: ${ally.relationship}"),
         trailing: const Icon(Icons.verified, color: Colors.teal),
       ),
@@ -525,74 +677,143 @@ class _MentorshipTab extends GetView<ProfileController> {
       padding: const EdgeInsets.all(20),
       child: Column(
         children: [
-          Obx(() => SwitchListTile(
-            title: const Text("Willing to Offer Support"),
-            value: controller.offerSupportC.value,
-            onChanged: (val) => controller.offerSupportC.value = val,
+          Obx(() => Container(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            decoration: BoxDecoration(
+              color: Get.theme.colorScheme.surfaceVariant.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: SwitchListTile(
+              title: const Text("Willing to Offer Support", style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: const Text("Allow others to reach out to you for guidance"),
+              activeColor: Get.theme.colorScheme.primary,
+              value: controller.offerSupportC.value,
+              onChanged: (val) => controller.offerSupportC.value = val,
+            ),
           )),
           const SizedBox(height: 16),
-          _buildTextField("Mentorship Goals", controller.mentorshipGoalsC, maxLines: 3),
+          _buildTextField("Mentorship Goals", controller.mentorshipGoalsC, icon: Icons.flag_outlined, maxLines: 3),
           const SizedBox(height: 16),
-          _buildTextField("Fitness Level", controller.fitnessLevelC),
+          _buildTextField("Fitness Level", controller.fitnessLevelC, icon: Icons.fitness_center_outlined),
           const SizedBox(height: 16),
-          _buildNumberField("Availability (Hours per week)", controller.availabilityHoursC),
+          _buildNumberField("Availability (Hours per week)", controller.availabilityHoursC, icon: Icons.schedule_outlined),
         ],
       ),
     );
   }
 }
 
-// Helper methods
-Widget _buildTextField(String label, RxString controller, {int maxLines = 1, bool readOnly = false, TextInputType? keyboardType}) {
-  return Obx(() => TextFormField(
-    initialValue: controller.value,
-    readOnly: readOnly,
-    keyboardType: keyboardType,
-    decoration: InputDecoration(
-      labelText: label,
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-      filled: readOnly,
-      fillColor: readOnly ? Colors.grey.withOpacity(0.1) : null,
-    ),
-    maxLines: maxLines,
-    onChanged: (val) => controller.value = val,
-  ));
-}
-
-Widget _buildNumberField(String label, RxInt controller) {
-  return Obx(() => TextFormField(
-    initialValue: controller.value.toString(),
-    decoration: InputDecoration(
-      labelText: label,
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-    ),
-    keyboardType: TextInputType.number,
-    onChanged: (val) => controller.value = int.tryParse(val) ?? 0,
-  ));
-}
-
-Widget _buildDropdown(String label, RxString controller, List<String> options) {
-  return Obx(() {
-    // Normalize: find the exact option that matches the controller value (case-insensitive)
-    String? effectiveValue;
-    if (controller.value.isNotEmpty) {
-      effectiveValue = options.firstWhere(
-        (o) => o.toLowerCase() == controller.value.toLowerCase(),
-        orElse: () => "",
+  Widget _buildTextField(String label, RxString controller, {int maxLines = 1, bool readOnly = false, TextInputType? keyboardType, IconData? icon}) {
+    return Obx(() {
+      final theme = Get.theme;
+      return TextFormField(
+        initialValue: controller.value,
+        readOnly: readOnly,
+        keyboardType: keyboardType,
+        maxLines: maxLines,
+        style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: TextStyle(color: theme.colorScheme.primary.withOpacity(0.8), fontWeight: FontWeight.w600),
+          prefixIcon: icon != null ? Icon(icon, color: theme.colorScheme.primary.withOpacity(0.7), size: 22) : null,
+          filled: true,
+          fillColor: readOnly 
+              ? theme.colorScheme.surfaceVariant.withOpacity(0.15) 
+              : theme.colorScheme.surfaceVariant.withOpacity(0.3),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.5),
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+        ),
+        onChanged: (val) => controller.value = val,
       );
-      if (effectiveValue.isEmpty) effectiveValue = null;
-    }
+    });
+  }
 
-    return DropdownButtonFormField<String>(
-      value: effectiveValue,
-      decoration: InputDecoration(
-        labelText: label,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-      items: options.map((o) => DropdownMenuItem(value: o, child: Text(o))).toList(),
-      onChanged: (val) {
-        if (val != null) controller.value = val;
-      },
-    );
-  });
-}
+  Widget _buildNumberField(String label, RxInt controller, {IconData? icon}) {
+    return Obx(() {
+      final theme = Get.theme;
+      return TextFormField(
+        initialValue: controller.value.toString(),
+        keyboardType: TextInputType.number,
+        style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: TextStyle(color: theme.colorScheme.primary.withOpacity(0.8), fontWeight: FontWeight.w600),
+          prefixIcon: icon != null ? Icon(icon, color: theme.colorScheme.primary.withOpacity(0.7), size: 22) : null,
+          filled: true,
+          fillColor: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.5),
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+        ),
+        onChanged: (val) => controller.value = int.tryParse(val) ?? 0,
+      );
+    });
+  }
+
+  Widget _buildDropdown(String label, RxString controller, List<String> options, {IconData? icon}) {
+    return Obx(() {
+      final theme = Get.theme;
+      // Normalize: find the exact option that matches the controller value (case-insensitive)
+      String? effectiveValue;
+      if (controller.value.isNotEmpty) {
+        effectiveValue = options.firstWhere(
+          (o) => o.toLowerCase() == controller.value.toLowerCase(),
+          orElse: () => "",
+        );
+        if (effectiveValue.isEmpty) effectiveValue = null;
+      }
+
+      return DropdownButtonFormField<String>(
+        value: effectiveValue,
+        style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: TextStyle(color: theme.colorScheme.primary.withOpacity(0.8), fontWeight: FontWeight.w600),
+          prefixIcon: icon != null ? Icon(icon, color: theme.colorScheme.primary.withOpacity(0.7), size: 22) : null,
+          filled: true,
+          fillColor: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.5),
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+        ),
+        items: options.map((o) => DropdownMenuItem(
+          value: o, 
+          child: Text(o, style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.w500)),
+        )).toList(),
+        onChanged: (val) {
+          if (val != null) controller.value = val;
+        },
+      );
+    });
+  }
