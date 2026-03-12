@@ -4,10 +4,12 @@ import 'package:livepoised_mobile/features/feed/data/models/post.dart';
 import '../../data/models/post_detail_response.dart';
 import '../../services/feed_service.dart';
 import '../../../auth/auth_controller.dart';
+import 'feed_controller.dart';
 
 class PostDetailsController extends GetxController {
   final FeedService _feedService = FeedService();
   final AuthController _authController = Get.find<AuthController>();
+  final FeedController _feedController = Get.find<FeedController>();
 
   final post = Rxn<Post>();
   final comments = <Comment>[].obs;
@@ -84,7 +86,10 @@ class PostDetailsController extends GetxController {
     isLiking.value = true;
     try {
       final success = await _feedService.likePost(currentPost.id);
-      if (!success) {
+      if (success) {
+        // Trigger background refetch for FeedView
+        _feedController.fetchPosts(refresh: true);
+      } else {
         // Revert on failure
         post.value = currentPost;
         Get.snackbar('Error', 'Failed to like post');
@@ -107,6 +112,10 @@ class PostDetailsController extends GetxController {
         // Refresh comments
         clearReply();
         await fetchPostDetails(post.value!.id);
+        
+        // Trigger background refetch for FeedView
+        _feedController.fetchPosts(refresh: true);
+        
         Get.snackbar('Success', 'Comment posted');
       } else {
         Get.snackbar('Error', 'Failed to post comment');

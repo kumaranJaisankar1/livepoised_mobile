@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1044735544019",
+    "project_id": "livepoiseddev",
+    "storage_bucket": "livepoiseddev.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1044735544019:android:ead60372f164858ebbe226",
+        "android_client_info": {
+          "package_name": "com.livepoised.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA3PKkGid2d5HkYyzVeMbb-mgG7_HQQmgc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -10,9 +10,14 @@ import 'features/auth/auth_controller.dart';
 import 'features/chat/data/datasource/chat_websocket_service.dart';
 import 'features/notification/presentation/controllers/notification_controller.dart';
 import 'features/network/presentation/controllers/network_controller.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   await GetStorage.init();
   await dotenv.load(fileName: ".env.dev");
 
