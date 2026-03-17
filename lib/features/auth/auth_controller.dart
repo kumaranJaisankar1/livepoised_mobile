@@ -203,6 +203,9 @@ class AuthController extends GetxController {
     if (Get.isRegistered<ProfileController>()) {
       Get.find<ProfileController>().refreshProfile();
     }
+    if (Get.isRegistered<NotificationController>()) {
+      Get.find<NotificationController>().updateDeviceToken();
+    }
   }
 }
 

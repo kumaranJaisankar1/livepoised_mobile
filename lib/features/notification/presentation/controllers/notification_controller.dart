@@ -1,9 +1,10 @@
 import 'dart:async';
+
 import 'package:get/get.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:get_storage/get_storage.dart';
 import '../../data/models/notification_model.dart';
 import '../../data/services/notification_service.dart';
-
 
 class NotificationController extends GetxController {
   final NotificationService _service = NotificationService();
@@ -15,7 +16,10 @@ class NotificationController extends GetxController {
   
   final _box = Get.find<GetStorage>();
   final _key = 'isNotificationsEnabled';
+  final _fcmTokenKey = 'last_registered_fcm_token';
+  final _deviceIdKey = 'persistent_device_id';
   Timer? _pollingTimer;
+  StreamSubscription<String>? _tokenRefreshSubscription;
 
   @override
   void onInit() {
@@ -24,7 +28,15 @@ class NotificationController extends GetxController {
     if (isNotificationsEnabled.value) {
       fetchNotifications();
       startPolling();
+      _setupTokenRefreshListener();
     }
+  }
+
+  void _setupTokenRefreshListener() {
+    _tokenRefreshSubscription?.cancel();
+    _tokenRefreshSubscription = FirebaseMessaging.instance.onTokenRefresh.listen((newToken) {
+      updateDeviceToken(newToken: newToken);
+    });
   }
 
   void _loadSettings() {
@@ -46,7 +58,39 @@ class NotificationController extends GetxController {
   @override
   void onClose() {
     _pollingTimer?.cancel();
+    _tokenRefreshSubscription?.cancel();
     super.onClose();
+  }
+
+  Future<void> updateDeviceToken({String? newToken}) async {
+    try {
+      final fcmToken = newToken ?? await FirebaseMessaging.instance.getToken();
+      if (fcmToken == null) return;
+
+      final lastToken = _box.read(_fcmTokenKey);
+      if (lastToken == fcmToken && newToken == null) {
+        print('FCM Token already registered and unchanged.');
+        return;
+      }
+
+      String deviceId = _box.read(_deviceIdKey) ?? '';
+      if (deviceId.isEmpty) {
+        deviceId = 'device-${DateTime.now().millisecondsSinceEpoch}-${_box.hashCode}';
+        await _box.write(_deviceIdKey, deviceId);
+      }
+
+      final success = await _service.registerDeviceToken(
+        fcmToken: fcmToken,
+        deviceId: deviceId,
+      );
+
+      if (success) {
+        await _box.write(_fcmTokenKey, fcmToken);
+        print('Successfully registered device token with backend.');
+      }
+    } catch (e) {
+      print('Error in updateDeviceToken: $e');
+    }
   }
 
   void startPolling() {

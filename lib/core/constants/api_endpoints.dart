@@ -73,6 +73,7 @@ class ApiEndpoints {
   static String get unreadNotifications => '$baseUrlSpringBoot/api/notifications/unread';
   static String markNotificationAsRead(int id) => '$baseUrlSpringBoot/api/notifications/$id/read';
   static String get markAllNotificationsAsRead => '$baseUrlSpringBoot/api/notifications/read-all';
+  static String get registerDeviceToken => '$baseUrlSpringBoot/api/device-tokens/register';
 
   // Redirect URI
   static const String redirectUri = 'com.livepoised.app://oidc/redirect';

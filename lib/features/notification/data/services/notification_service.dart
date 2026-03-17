@@ -55,4 +55,20 @@ class NotificationService {
       return false;
     }
   }
+
+  Future<bool> registerDeviceToken({required String fcmToken, String? deviceId}) async {
+    try {
+      final response = await _dio.post(
+        ApiEndpoints.registerDeviceToken,
+        data: {
+          'fcmToken': fcmToken,
+          'deviceId': deviceId,
+        },
+      );
+      return response.statusCode == 200 || response.statusCode == 201;
+    } catch (e) {
+      print('Error registering device token: $e');
+      return false;
+    }
+  }
 }

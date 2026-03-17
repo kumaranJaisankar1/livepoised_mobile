@@ -11,13 +11,26 @@ import 'features/chat/data/datasource/chat_websocket_service.dart';
 import 'features/notification/presentation/controllers/notification_controller.dart';
 import 'features/network/presentation/controllers/network_controller.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'firebase_options.dart';
+import 'core/services/push_notification_service.dart';
+
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  print("Handling a background message: ${message.messageId}");
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // Initialize Push Notification Service
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  await PushNotificationService().initialize();
+
   await GetStorage.init();
   await dotenv.load(fileName: ".env.dev");
 
