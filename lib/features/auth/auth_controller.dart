@@ -167,12 +167,35 @@ class AuthController extends GetxController {
   }
 
   Future<void> loginWithGoogle() async {
-    // Standard OIDC flow often handles IDP selection via kc_idp_hint
-    // But loginWithBrowser already provides the standard Keycloak login page
-    // where users can select Google if configured. 
-    // To go DIRECTLY to Google, we'd use getSocialLoginUrl with a webview,
-    // but the recommended flow in the guide is browser-based PKCE.
-    loginWithBrowser();
+    isLoading.value = true;
+    try {
+      final success = await _authService.signInWithSocialProvider('google');
+      print('Google Login Success: $success');
+      if (success) {
+        await _authService.syncWithBackend();
+        final profile = await _storage.getUserProfile();
+        userProfile.value = profile;
+        isLoggedIn.value = true;
+        _fetchInitialData();
+        Get.offAllNamed('/');
+      } else {
+        Get.snackbar('Login Failed', 'Google login returned empty result. Check logs for details.',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.redAccent,
+          colorText: Colors.white,
+        );
+      }
+    } catch (e) {
+      print('Google Login Controller Error: $e');
+      Get.snackbar('Google Login Error', e.toString(),
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.redAccent,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 8),
+      );
+    } finally {
+      isLoading.value = false;
+    }
   }
 
   Future<void> handleSocialAuthCallback(String code) async {

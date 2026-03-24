@@ -2,17 +2,19 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_appauth/flutter_appauth.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:livepoised_mobile/core/storage/secure_storage_service.dart';
 import 'package:livepoised_mobile/core/constants/api_endpoints.dart';
 import 'package:livepoised_mobile/core/network/dio_client.dart';
 import 'package:livepoised_mobile/core/models/user_model.dart';
+import 'dart:developer' as developer;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 
 class AuthService {
   final Dio _dio = DioClient().springBoot;
   final SecureStorageService _storage = SecureStorageService();
   final FlutterAppAuth _appAuth = const FlutterAppAuth();
-
 
   Future<bool> loginWithCredentials(String username, String password) async {
     try {
@@ -20,7 +22,7 @@ class AuthService {
         ApiEndpoints.tokenEndpoint,
         data: {
           'client_id': ApiEndpoints.clientId,
-          'client_secret': dotenv.get('CLIENT_SECRET'),
+          "client_secret": dotenv.get('CLIENT_SECRET'),
           'grant_type': 'password',
           'username': username,
           'password': password,
@@ -46,10 +48,10 @@ class AuthService {
       return false;
     } on DioException catch (e) {
       final message = e.response?.data?['error_description'] ?? e.message;
-      print('Direct Login Error: $message');
+      developer.log('Direct Login Error: $message');
       throw message;
     } catch (e) {
-      print('Direct Login Error: $e');
+      developer.log('Direct Login Error: $e');
       rethrow;
     }
   }
@@ -76,8 +78,101 @@ class AuthService {
       }
       return false;
     } catch (e) {
-      print('Browser Login Error: $e');
+      developer.log('Browser Login Error: $e');
       return false;
+    }
+  }
+
+  final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
+
+  Future<bool> signInWithSocialProvider(String provider) async {
+    if (provider.toLowerCase() == 'google') {
+      return _signInWithGoogleNative();
+    }
+    
+    // Fallback or other providers can still use browser flow if needed in the future
+    throw UnsupportedError('Only native google login is supported currently.');
+  }
+
+  Future<bool> _signInWithGoogleNative() async {
+    try {
+      developer.log('Starting Native Google Sign-In...');
+      
+      // In google_sign_in 7.x+, initialize must be called once with the Client IDs.
+      await _googleSignIn.initialize(
+        clientId: '1044735544019-p5kamj65bur9ns9ss30ldp223cstdn0t.apps.googleusercontent.com', // Android Client ID
+        serverClientId: '1044735544019-oakt4j9pb0ob7dkd5oe3urtfspivanu5.apps.googleusercontent.com', // Web Client ID
+      );
+
+      // 1. Trigger Google login
+      final GoogleSignInAccount googleUser;
+      try {
+        googleUser = await _googleSignIn.authenticate(
+          scopeHint: ['email', 'profile'],
+        );
+      } on GoogleSignInException catch (e) {
+        if (e.code == GoogleSignInExceptionCode.canceled) {
+          developer.log('Google sign-in was cancelled by the user');
+          return false;
+        }
+        rethrow;
+      }
+
+      developer.log('Google User Authenticated: ${googleUser.email}');
+
+      // 2. Retrieve the authenticated user's tokens
+      // Keycloak standard Token Exchange requires the ID token (JWT) so it can read the 'iss' claim and find the Google Identity Provider.
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final String? googleIdToken = googleAuth.idToken;
+
+      if (googleIdToken == null) {
+        developer.log('Failed to retrieve Google ID Token. Ensure the Web Client ID is correct.');
+        return false;
+      }
+
+      developer.log('Google ID Token retrieved successfully, proceeding to Keycloak Token Exchange');
+
+      // 3. Token Exchange with Keycloak
+      final response = await _dio.post(
+        ApiEndpoints.tokenEndpoint,
+        data: {
+          'client_id': ApiEndpoints.clientId,
+          'grant_type': 'urn:ietf:params:oauth:grant-type:token-exchange',
+          'subject_token': googleIdToken,
+          "subject_token_type": "urn:ietf:params:oauth:token-type:id_token",
+           "subject_issuer": "google",
+           "client_secret": dotenv.get('CLIENT_SECRET'),
+        },
+        options: Options(
+          contentType: Headers.formUrlEncodedContentType,
+        ),
+      );
+
+      // 4. Parse and store expected output
+      if (response.statusCode == 200) {
+        final data = response.data;
+        developer.log('Keycloak Token Exchange successful');
+        
+        final userProfile = _parseUserProfileFromIdToken(data['id_token']);
+        
+        await _storage.saveTokens(
+          accessToken: data['access_token'],
+          refreshToken: data['refresh_token'], // May be null depending on Keycloak offline_access scope settings for token exchange
+          idToken: data['id_token'],
+          userProfile: userProfile,
+        );
+        return true;
+      }
+      developer.log('Keycloak token exchange failed with status: ${response.statusCode}');
+      return false;
+      
+    } on DioException catch (e) {
+      final message = e.response?.data?['error_description'] ?? e.message;
+      developer.log('Keycloak Token Exchange DioError: $message');
+      throw message;
+    } catch (e) {
+      developer.log('Google Sign-In Error: $e');
+      rethrow;
     }
   }
 
@@ -99,7 +194,7 @@ class AuthService {
         'name': data['name'],
       });
     } catch (e) {
-      print('Error parsing ID token: $e');
+      developer.log('Error parsing ID token: $e');
       return null;
     }
   }
@@ -119,16 +214,16 @@ class AuthService {
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        print('Backend synchronization successful');
+        developer.log('Backend synchronization successful');
         return true;
       }
-      print('Backend synchronization failed: ${response.statusCode}');
+      developer.log('Backend synchronization failed: ${response.statusCode}');
       return false;
     } on DioException catch (e) {
-      print('Backend Sync Error: ${e.response?.data ?? e.message}');
+      developer.log('Backend Sync Error: ${e.response?.data ?? e.message}');
       return false;
     } catch (e) {
-      print('Backend Sync Error: $e');
+      developer.log('Backend Sync Error: $e');
       return false;
     }
   }
@@ -142,7 +237,6 @@ class AuthService {
         ApiEndpoints.tokenEndpoint,
         data: {
           'client_id': ApiEndpoints.clientId,
-          'client_secret': dotenv.get('CLIENT_SECRET'),
           'grant_type': 'refresh_token',
           'refresh_token': refreshToken,
         },
@@ -164,7 +258,7 @@ class AuthService {
       }
       return false;
     } catch (e) {
-      print('Token Refresh Error: $e');
+      developer.log('Token Refresh Error: $e');
       return false;
     }
   }
@@ -197,7 +291,6 @@ class AuthService {
         ApiEndpoints.tokenEndpoint,
         data: {
           'client_id': ApiEndpoints.clientId,
-          'client_secret': dotenv.get('CLIENT_SECRET'),
           'grant_type': 'authorization_code',
           'code': code,
           'code_verifier': verifier,
@@ -221,7 +314,7 @@ class AuthService {
       }
       return false;
     } catch (e) {
-      print('Token Exchange Error: $e');
+      developer.log('Token Exchange Error: $e');
       return false;
     }
   }
@@ -234,7 +327,6 @@ class AuthService {
           ApiEndpoints.logoutEndpoint,
           data: {
             'client_id': ApiEndpoints.clientId,
-            'client_secret': dotenv.get('CLIENT_SECRET'),
             'refresh_token': refreshToken,
           },
           options: Options(
@@ -243,7 +335,7 @@ class AuthService {
         );
       }
     } catch (e) {
-      print('Server Logout Error: $e');
+      developer.log('Server Logout Error: $e');
     } finally {
       await _storage.clearAll();
     }
@@ -267,4 +359,3 @@ class AuthService {
         '&redirect_uri=${ApiEndpoints.redirectUri}';
   }
 }
-
