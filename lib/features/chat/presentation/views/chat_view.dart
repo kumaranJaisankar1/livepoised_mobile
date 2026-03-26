@@ -19,11 +19,12 @@ class ChatView extends GetView<ChatController> {
         titleSpacing: 0,
         title: Obx(() {
           final item = controller.inboxItem.value;
+          final String fallbackTitle = controller.otherUsername ?? 'Chat';
           final String title = item != null 
               ? '${item.otherUserFirstName ?? ""} ${item.otherUserLastName ?? ""}'.trim().isEmpty 
                   ? item.otherUsername 
                   : '${item.otherUserFirstName ?? ""} ${item.otherUserLastName ?? ""}'
-              : otherUser;
+              : fallbackTitle;
 
           return Row(
             children: [
@@ -74,116 +75,145 @@ class ChatView extends GetView<ChatController> {
                             final msg = controller.messages[index];
                             final isMe = msg.senderUsername == controller.currentUsername;
 
-                            return _ChatBubble(message: msg, isMe: isMe);
-                          },
-                        ),
-            ),
-          ),
-          _MessageInput(
-            controller: textController,
-            onSend: (text) {
-              final String? recipient = controller.otherUsername;
-              if (recipient != null) {
-                controller.sendMessage(text, recipient);
-              }
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildShimmerChat(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final baseColor = isDark ? Colors.grey[800]! : Colors.grey[300]!;
-    final highlightColor = isDark ? Colors.grey[700]! : Colors.grey[100]!;
-
-    return ListView.builder(
-      reverse: true,
-      padding: const EdgeInsets.all(16),
-      itemCount: 10,
-      itemBuilder: (context, index) {
-        final isMe = index % 3 == 0;
-        return Shimmer.fromColors(
-          baseColor: baseColor,
-          highlightColor: highlightColor,
-          child: Align(
-            alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-            child: Container(
-              margin: const EdgeInsets.symmetric(vertical: 4),
-              width: MediaQuery.of(context).size.width * (0.4 + (index % 4) * 0.1),
-              height: 40,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20).copyWith(
-                  bottomRight: isMe ? const Radius.circular(4) : const Radius.circular(20),
-                  bottomLeft: !isMe ? const Radius.circular(4) : const Radius.circular(20),
+                                return _ChatBubble(
+                                  message: msg, 
+                                  isMe: isMe,
+                                  otherUserImageUrl: controller.inboxItem.value?.otherUserImageUrl,
+                                  otherUserInitial: (controller.inboxItem.value?.otherUserFirstName ?? 
+                                                     controller.inboxItem.value?.otherUsername ?? "C")[0].toUpperCase(),
+                                );
+                              },
+                            ),
                 ),
               ),
-            ),
+              _MessageInput(
+                controller: textController,
+                onSend: (text) {
+                  final String? recipient = controller.otherUsername;
+                  if (recipient != null) {
+                    controller.sendMessage(text, recipient);
+                  }
+                },
+              ),
+            ],
           ),
         );
-      },
-    );
-  }
-}
-
-class _ChatBubble extends StatelessWidget {
-  final ChatMessage message;
-  final bool isMe;
-
-  const _ChatBubble({required this.message, required this.isMe});
-
-  @override
-  Widget build(BuildContext context) {
-    return Align(
-      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-      child: Column(
-        crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-        children: [
-          Container(
-            constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
-            margin: const EdgeInsets.symmetric(vertical: 4),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              color: isMe 
-                  ? Theme.of(context).colorScheme.primary 
-                  : Theme.of(context).colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(20).copyWith(
-                bottomRight: isMe ? const Radius.circular(4) : const Radius.circular(20),
-                bottomLeft: !isMe ? const Radius.circular(4) : const Radius.circular(20),
+      }
+    
+      Widget _buildShimmerChat(BuildContext context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        final baseColor = isDark ? Colors.grey[800]! : Colors.grey[300]!;
+        final highlightColor = isDark ? Colors.grey[700]! : Colors.grey[100]!;
+    
+        return ListView.builder(
+          reverse: true,
+          padding: const EdgeInsets.all(16),
+          itemCount: 10,
+          itemBuilder: (context, index) {
+            final isMe = index % 3 == 0;
+            return Shimmer.fromColors(
+              baseColor: baseColor,
+              highlightColor: highlightColor,
+              child: Align(
+                alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                child: Container(
+                  margin: const EdgeInsets.symmetric(vertical: 4),
+                  width: MediaQuery.of(context).size.width * (0.4 + (index % 4) * 0.1),
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20).copyWith(
+                      bottomRight: isMe ? const Radius.circular(4) : const Radius.circular(20),
+                      bottomLeft: !isMe ? const Radius.circular(4) : const Radius.circular(20),
+                    ),
+                  ),
+                ),
               ),
-              boxShadow: isMe ? [
-                BoxShadow(
-                  color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                )
-              ] : [],
-            ),
-            child: Text(
-              message.content,
-              style: TextStyle(
-                color: isMe ? Colors.white : Theme.of(context).colorScheme.onSurfaceVariant,
+            );
+          },
+        );
+      }
+    }
+    
+    class _ChatBubble extends StatelessWidget {
+      final ChatMessage message;
+      final bool isMe;
+      final String? otherUserImageUrl;
+      final String otherUserInitial;
+    
+      const _ChatBubble({
+        required this.message, 
+        required this.isMe,
+        this.otherUserImageUrl,
+        required this.otherUserInitial,
+      });
+    
+      @override
+      Widget build(BuildContext context) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Row(
+            mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              if (!isMe) ...[
+                CircleAvatar(
+                  radius: 14,
+                  backgroundImage: ImageUtils.getImageProvider(otherUserImageUrl),
+                  child: (otherUserImageUrl == null || otherUserImageUrl!.isEmpty)
+                      ? Text(otherUserInitial, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold))
+                      : null,
+                ),
+                const SizedBox(width: 8),
+              ],
+              Flexible(
+                child: Column(
+                  crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.65),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: isMe 
+                            ? Theme.of(context).colorScheme.primary 
+                            : Theme.of(context).colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(20).copyWith(
+                          bottomRight: isMe ? const Radius.circular(4) : const Radius.circular(20),
+                          bottomLeft: !isMe ? const Radius.circular(4) : const Radius.circular(20),
+                        ),
+                        boxShadow: isMe ? [
+                          BoxShadow(
+                            color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          )
+                        ] : [],
+                      ),
+                      child: Text(
+                        message.content,
+                        style: TextStyle(
+                          color: isMe ? Colors.white : Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      child: Text(
+                        '${timeago.format(message.timestamp, locale: 'en_short')}${message.isOptimistic ? " • sending..." : ""}',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
+            ],
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Text(
-              '${timeago.format(message.timestamp, locale: 'en_short')}${message.isOptimistic ? " • sending..." : ""}',
-              style: TextStyle(
-                fontSize: 10,
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
-              ),
-            ),
-          ),
-          const SizedBox(height: 4),
-        ],
-      ),
-    );
-  }
-}
+        );
+      }
+    }
 
 class _MessageInput extends StatelessWidget {
   final TextEditingController controller;

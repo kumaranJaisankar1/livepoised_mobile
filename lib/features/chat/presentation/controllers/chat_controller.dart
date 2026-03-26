@@ -4,6 +4,7 @@ import '../../../auth/auth_controller.dart';
 import '../../data/datasource/chat_service.dart';
 import '../../data/datasource/chat_websocket_service.dart';
 import '../../data/models/chat_message.dart';
+import '../../data/models/chat_connection.dart';
 import '../../data/models/inbox_item.dart';
 import 'chat_list_controller.dart';
 
@@ -23,6 +24,7 @@ class ChatController extends GetxController {
     if (inboxItem.value != null) return inboxItem.value!.otherUsername;
     final args = Get.arguments;
     if (args is String) return args;
+    if (args is ChatConnection) return args.username;
     return null;
   }
 
@@ -116,6 +118,15 @@ class ChatController extends GetxController {
     final args = Get.arguments;
     if (args is InboxItem) {
       inboxItem.value = args;
+    } else if (args is ChatConnection) {
+      // Map ChatConnection to InboxItem for UI display while loading
+      inboxItem.value = InboxItem(
+        otherUsername: args.username,
+        otherUserFirstName: args.firstName,
+        otherUserLastName: args.lastName,
+        otherUserImageUrl: args.profileImage,
+        timestamp: DateTime.now(),
+      );
     }
 
     final String? otherUser = otherUsername;
