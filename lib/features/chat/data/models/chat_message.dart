@@ -13,6 +13,7 @@ class ChatMessage with _$ChatMessage {
     @JsonKey(name: 'receiver_username') required String receiverUsername,
     required String content,
     required DateTime timestamp,
+    @JsonKey(name: 'updated_at') DateTime? updatedAt,
     @JsonKey(name: 'is_encrypted') @Default(false) bool isEncrypted,
     @Default(false) bool isOptimistic,
   }) = _ChatMessage;

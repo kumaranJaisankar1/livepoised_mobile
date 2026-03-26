@@ -17,6 +17,7 @@ class ApiEndpoints {
 
   // Backend Auth Synchronization
   static String get googleSync => '$baseUrlSpringBoot/auth/google-sync';
+  static String get googleLogin => '$baseUrlSpringBoot/auth/google-login';
   static String get register => '$baseUrlSpringBoot/auth/register';
   static String get login => '$baseUrlSpringBoot/auth/login';
 
@@ -45,6 +46,8 @@ class ApiEndpoints {
   static String get connections => '$baseUrlSpringBoot/api/connections';
 
   // Chat API (FastAPI)
+  static String getChatInbox(String username) => '$baseUrlFastAPI/chat/inbox?username=$username';
+  static String startChatInbox(String otherUsername, String currentUsername) => '$baseUrlFastAPI/chat/inbox/start/$otherUsername?username=$currentUsername';
   static String getChatHistory(String current, String other) => '$baseUrlFastAPI/chat/history/$current/$other';
   static String get chatWsUrl => baseWSURL;
 

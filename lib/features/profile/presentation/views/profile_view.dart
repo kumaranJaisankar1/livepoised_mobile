@@ -319,7 +319,7 @@ class ProfileView extends GetView<ProfileController> {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      profile.personalDetails.injuryType,
+                      profile.personalDetails?.injuryType ?? '',
                       style: theme.textTheme.titleSmall?.copyWith(
                         color: theme.colorScheme.secondary,
                         fontWeight: FontWeight.w500,
@@ -384,7 +384,7 @@ class ProfileView extends GetView<ProfileController> {
   Widget _buildContactChips(BuildContext context, ProfileResponse profile) {
     final addr = profile.address;
     final chips = [
-      "${addr.city}, ${addr.country}",
+      "${addr?.city ?? ''}, ${addr?.country ?? ''}",
       "Joined ${DateFormat('MMM yyyy').format(DateTime.now())}", // Placeholder for join date
       profile.userProfile.email,
     ];
@@ -430,7 +430,7 @@ class ProfileView extends GetView<ProfileController> {
           _buildStatCard(context, "Active Ally's", controller.connectionsCount.value.toString(), Colors.teal),
           _buildStatCard(context, "Forum Posts", profile.forumPostsCount.toString(), Colors.blue),
           _buildStatCard(context, "Helpful Responses", profile.helpfulResponsesCount.toString(), Colors.green),
-          _buildStatCard(context, "Journey", "${profile.personalDetails.yearsSinceRecovery ?? 0}" , Colors.amber, icon: Icons.person_pin_circle_outlined),
+          _buildStatCard(context, "Journey", "${profile.personalDetails?.yearsSinceRecovery ?? 0}" , Colors.amber, icon: Icons.person_pin_circle_outlined),
         ],
       ),
     );
@@ -542,9 +542,9 @@ class ProfileView extends GetView<ProfileController> {
             icon: Icons.medical_services_outlined,
             child: Column(
               children: [
-                _buildDetailRow(context, "Type", details.injuryType),
-                _buildDetailRow(context, "Duration", "${details.yearsSinceInjury} years since injury"),
-                _buildDetailRow(context, "Recovery Stage", details.stageOfRecovery),
+                _buildDetailRow(context, "Type", details?.injuryType ?? 'N/A'),
+                _buildDetailRow(context, "Duration", "${details?.yearsSinceInjury ?? 0} years since injury"),
+                _buildDetailRow(context, "Recovery Stage", details?.stageOfRecovery ?? 'N/A'),
               ],
             ),
           ),
@@ -553,10 +553,10 @@ class ProfileView extends GetView<ProfileController> {
             context,
             title: "RECENT ACHIEVEMENTS",
             icon: Icons.workspace_premium_outlined,
-            child: details.achievements.isEmpty
+            child: details?.achievements.isEmpty ?? true
                 ? const Text("No achievements yet.")
                 : Column(
-                    children: details.achievements.map((a) => ListTile(
+                    children: details!.achievements.map((a) => ListTile(
                       contentPadding: EdgeInsets.zero,
                       leading: Container(
                         padding: const EdgeInsets.all(8),
@@ -641,7 +641,7 @@ class ProfileView extends GetView<ProfileController> {
     );
   }
 
-  Widget _buildRecoveryStoryTab(BuildContext context, PersonalDetails details) {
+  Widget _buildRecoveryStoryTab(BuildContext context, PersonalDetails? details) {
     return SingleChildScrollView(
       key: const PageStorageKey('story'),
       padding: const EdgeInsets.all(20),
@@ -652,19 +652,19 @@ class ProfileView extends GetView<ProfileController> {
             context,
             title: "PERSONAL STORY",
             icon: Icons.history_edu,
-            child: Text(details.personalStory ?? "No story shared yet.", style: const TextStyle(height: 1.6)),
+            child: Text(details?.personalStory ?? "No story shared yet.", style: const TextStyle(height: 1.6)),
           ),
           const SizedBox(height: 24),
           _buildCardSection(
             context,
             title: "RECOVERY MILESTONES",
             icon: Icons.auto_graph,
-            child: details.recoveryMilestones.isEmpty
+            child: (details?.recoveryMilestones.isEmpty ?? true)
                 ? const Text("No milestones recorded.")
                 : ListView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    itemCount: details.recoveryMilestones.length,
+                    itemCount: details!.recoveryMilestones.length,
                     itemBuilder: (context, index) {
                       final m = details.recoveryMilestones[index];
                       final isLast = index == details.recoveryMilestones.length - 1;

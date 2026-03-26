@@ -13,6 +13,9 @@ _$ChatMessageImpl _$$ChatMessageImplFromJson(Map<String, dynamic> json) =>
       receiverUsername: json['receiver_username'] as String,
       content: json['content'] as String,
       timestamp: DateTime.parse(json['timestamp'] as String),
+      updatedAt: json['updated_at'] == null
+          ? null
+          : DateTime.parse(json['updated_at'] as String),
       isEncrypted: json['is_encrypted'] as bool? ?? false,
       isOptimistic: json['isOptimistic'] as bool? ?? false,
     );
@@ -24,6 +27,7 @@ Map<String, dynamic> _$$ChatMessageImplToJson(_$ChatMessageImpl instance) =>
       'receiver_username': instance.receiverUsername,
       'content': instance.content,
       'timestamp': instance.timestamp.toIso8601String(),
+      'updated_at': instance.updatedAt?.toIso8601String(),
       'is_encrypted': instance.isEncrypted,
       'isOptimistic': instance.isOptimistic,
     };

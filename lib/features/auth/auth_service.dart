@@ -83,7 +83,7 @@ class AuthService {
     }
   }
 
-  final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
+
 
   Future<bool> signInWithSocialProvider(String provider) async {
     if (provider.toLowerCase() == 'google') {
@@ -97,81 +97,74 @@ class AuthService {
   Future<bool> _signInWithGoogleNative() async {
     try {
       developer.log('Starting Native Google Sign-In...');
-      
-      // In google_sign_in 7.x+, initialize must be called once with the Client IDs.
-      await _googleSignIn.initialize(
-        clientId: '1044735544019-p5kamj65bur9ns9ss30ldp223cstdn0t.apps.googleusercontent.com', // Android Client ID
-        serverClientId: '1044735544019-oakt4j9pb0ob7dkd5oe3urtfspivanu5.apps.googleusercontent.com', // Web Client ID
+
+      // google_sign_in v6 API - exposes accessToken needed for Keycloak Token Exchange
+      final GoogleSignIn googleSignIn = GoogleSignIn(
+        scopes: ['email', 'profile'],
+        serverClientId: '1044735544019-oakt4j9pb0ob7dkd5oe3urtfspivanu5.apps.googleusercontent.com',
       );
 
       // 1. Trigger Google login
-      final GoogleSignInAccount googleUser;
-      try {
-        googleUser = await _googleSignIn.authenticate(
-          scopeHint: ['email', 'profile'],
-        );
-      } on GoogleSignInException catch (e) {
-        if (e.code == GoogleSignInExceptionCode.canceled) {
-          developer.log('Google sign-in was cancelled by the user');
-          return false;
-        }
-        rethrow;
+      // Sign out first to clear cached session and force account picker to appear
+      await googleSignIn.signOut();
+      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+      if (googleUser == null) {
+        developer.log('Google sign-in was cancelled by the user');
+        return false;
       }
 
       developer.log('Google User Authenticated: ${googleUser.email}');
 
-      // 2. Retrieve the authenticated user's tokens
-      // Keycloak standard Token Exchange requires the ID token (JWT) so it can read the 'iss' claim and find the Google Identity Provider.
+      // 2. Get tokens — v6 exposes both accessToken and idToken
       final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-      final String? googleIdToken = googleAuth.idToken;
+      final String? accessToken = googleAuth.accessToken;
 
-      if (googleIdToken == null) {
-        developer.log('Failed to retrieve Google ID Token. Ensure the Web Client ID is correct.');
+      if (accessToken == null) {
+        developer.log('Failed to retrieve Google Access Token.');
         return false;
       }
 
-      developer.log('Google ID Token retrieved successfully, proceeding to Keycloak Token Exchange');
+      developer.log('Google Access Token retrieved. Exchanging with Keycloak...');
 
-      // 3. Token Exchange with Keycloak
+      // 3. Token Exchange with Keycloak using the real Google Access Token
       final response = await _dio.post(
         ApiEndpoints.tokenEndpoint,
         data: {
           'client_id': ApiEndpoints.clientId,
           'grant_type': 'urn:ietf:params:oauth:grant-type:token-exchange',
-          'subject_token': googleIdToken,
-          "subject_token_type": "urn:ietf:params:oauth:token-type:id_token",
-           "subject_issuer": "google",
-           "client_secret": dotenv.get('CLIENT_SECRET'),
+          'subject_token': accessToken,
+          'subject_token_type': 'urn:ietf:params:oauth:token-type:access_token',
+          'subject_issuer': 'google',
+          'client_secret': dotenv.get('CLIENT_SECRET'),
+          'scope': 'openid profile email offline_access',
         },
         options: Options(
           contentType: Headers.formUrlEncodedContentType,
         ),
       );
 
-      // 4. Parse and store expected output
+      // 4. Parse and store Keycloak tokens
       if (response.statusCode == 200) {
         final data = response.data;
         developer.log('Keycloak Token Exchange successful');
-        
         final userProfile = _parseUserProfileFromIdToken(data['id_token']);
-        
         await _storage.saveTokens(
           accessToken: data['access_token'],
-          refreshToken: data['refresh_token'], // May be null depending on Keycloak offline_access scope settings for token exchange
+          refreshToken: data['refresh_token'],
           idToken: data['id_token'],
           userProfile: userProfile,
         );
         return true;
       }
-      developer.log('Keycloak token exchange failed with status: ${response.statusCode}');
+      developer.log('Keycloak token exchange failed with status: \${response.statusCode}');
       return false;
-      
+
     } on DioException catch (e) {
       final message = e.response?.data?['error_description'] ?? e.message;
-      developer.log('Keycloak Token Exchange DioError: $message');
+      developer.log('Keycloak Token Exchange DioError: \$message');
       throw message;
     } catch (e) {
-      developer.log('Google Sign-In Error: $e');
+      developer.log('Google Sign-In Error: \$e');
       rethrow;
     }
   }
@@ -237,6 +230,7 @@ class AuthService {
         ApiEndpoints.tokenEndpoint,
         data: {
           'client_id': ApiEndpoints.clientId,
+          'client_secret': dotenv.get('CLIENT_SECRET'),
           'grant_type': 'refresh_token',
           'refresh_token': refreshToken,
         },
@@ -323,17 +317,28 @@ class AuthService {
     final refreshToken = await _storage.getRefreshToken();
     try {
       if (refreshToken != null) {
+        // client_secret is required for Keycloak to invalidate the server-side session
         await _dio.post(
           ApiEndpoints.logoutEndpoint,
           data: {
             'client_id': ApiEndpoints.clientId,
+            'client_secret': dotenv.get('CLIENT_SECRET'),
             'refresh_token': refreshToken,
           },
           options: Options(
             contentType: Headers.formUrlEncodedContentType,
           ),
         );
+        developer.log('Keycloak session successfully terminated');
       }
+
+      // Also sign out from Google to clear the local account cache
+      try {
+        final GoogleSignIn googleSignIn = GoogleSignIn();
+        await googleSignIn.signOut();
+        developer.log('Google Sign-Out successful');
+      } catch (_) {}
+
     } catch (e) {
       developer.log('Server Logout Error: $e');
     } finally {

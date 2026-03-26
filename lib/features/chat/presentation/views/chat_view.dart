@@ -18,19 +18,19 @@ class ChatView extends GetView<ChatController> {
       appBar: AppBar(
         titleSpacing: 0,
         title: Obx(() {
-          final conn = controller.connection.value;
-          final String title = conn != null 
-              ? '${conn.firstName ?? ""} ${conn.lastName ?? ""}'.trim().isEmpty 
-                  ? conn.username 
-                  : '${conn.firstName ?? ""} ${conn.lastName ?? ""}'
+          final item = controller.inboxItem.value;
+          final String title = item != null 
+              ? '${item.otherUserFirstName ?? ""} ${item.otherUserLastName ?? ""}'.trim().isEmpty 
+                  ? item.otherUsername 
+                  : '${item.otherUserFirstName ?? ""} ${item.otherUserLastName ?? ""}'
               : otherUser;
 
           return Row(
             children: [
               CircleAvatar(
                 radius: 20,
-                backgroundImage: ImageUtils.getImageProvider(conn?.profileImage),
-                child: (conn?.profileImage == null || conn!.profileImage!.isEmpty)
+                backgroundImage: ImageUtils.getImageProvider(item?.otherUserImageUrl),
+                child: (item?.otherUserImageUrl == null || item!.otherUserImageUrl!.isEmpty)
                     ? Text(title[0].toUpperCase())
                     : null,
               ),

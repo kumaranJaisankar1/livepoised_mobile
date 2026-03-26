@@ -154,7 +154,7 @@ class NetworkController extends GetxController {
         query: query,
         condition: selectedCondition.value.isNotEmpty 
             ? selectedCondition.value 
-            : profile?.personalDetails.conditionDetails ?? '',
+            : profile?.personalDetails?.conditionDetails ?? '',
         preferredCountry: selectedCountry.value,
         preferredLanguages: selectedLanguages.toList(),
         minExperienceYears: minExperienceYears.value,

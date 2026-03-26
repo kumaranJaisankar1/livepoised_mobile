@@ -239,30 +239,30 @@ class ProfileController extends GetxController {
     mobileNumberC.value = user.mobileNumber ?? "";
     phone1C.value = user.phone1 ?? "";
     phone2C.value = user.phone2 ?? "";
-    addressLine1C.value = addr.addressLine1 ?? "";
-    addressLine2C.value = addr.addressLine2 ?? "";
-    cityC.value = addr.city;
-    stateC.value = addr.state;
-    countryC.value = addr.country;
-    postalCodeC.value = addr.postalCode;
+    addressLine1C.value = addr?.addressLine1 ?? "";
+    addressLine2C.value = addr?.addressLine2 ?? "";
+    cityC.value = addr?.city ?? "";
+    stateC.value = addr?.state ?? "";
+    countryC.value = addr?.country ?? "";
+    postalCodeC.value = addr?.postalCode ?? "";
 
     // Tab 3
     aboutMeC.value = user.aboutMe ?? "";
-    injuryTypeC.value = details.injuryType;
-    injuryDetailsC.value = details.injuryDetails ?? "";
-    yearsSinceInjuryC.value = details.yearsSinceInjury;
-    yearsSinceRecoveryC.value = details.yearsSinceRecovery ?? 0;
-    personalStoryC.value = details.personalStory ?? "";
-    conditionDetailsC.value = details.conditionDetails ?? "";
-    stageOfRecoveryC.value = details.stageOfRecovery;
-    recoveryMilestonesC.assignAll(details.recoveryMilestones);
-    achievementsC.assignAll(details.achievements);
+    injuryTypeC.value = details?.injuryType ?? "";
+    injuryDetailsC.value = details?.injuryDetails ?? "";
+    yearsSinceInjuryC.value = details?.yearsSinceInjury ?? 0;
+    yearsSinceRecoveryC.value = details?.yearsSinceRecovery ?? 0;
+    personalStoryC.value = details?.personalStory ?? "";
+    conditionDetailsC.value = details?.conditionDetails ?? "";
+    stageOfRecoveryC.value = details?.stageOfRecovery ?? "";
+    recoveryMilestonesC.assignAll(details?.recoveryMilestones ?? []);
+    achievementsC.assignAll(details?.achievements ?? []);
 
     // Tab 5
-    offerSupportC.value = details.offerSupport;
-    mentorshipGoalsC.value = details.mentorshipGoals ?? "";
-    fitnessLevelC.value = details.fitnessLevel ?? "";
-    availabilityHoursC.value = details.availabilityHoursPerWeek ?? 0;
+    offerSupportC.value = details?.offerSupport ?? false;
+    mentorshipGoalsC.value = details?.mentorshipGoals ?? "";
+    fitnessLevelC.value = details?.fitnessLevel ?? "";
+    availabilityHoursC.value = details?.availabilityHoursPerWeek ?? 0;
   }
 
   Future<void> saveProfile() async {

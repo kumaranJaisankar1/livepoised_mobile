@@ -29,6 +29,8 @@ mixin _$ChatMessage {
   String get receiverUsername => throw _privateConstructorUsedError;
   String get content => throw _privateConstructorUsedError;
   DateTime get timestamp => throw _privateConstructorUsedError;
+  @JsonKey(name: 'updated_at')
+  DateTime? get updatedAt => throw _privateConstructorUsedError;
   @JsonKey(name: 'is_encrypted')
   bool get isEncrypted => throw _privateConstructorUsedError;
   bool get isOptimistic => throw _privateConstructorUsedError;
@@ -56,6 +58,7 @@ abstract class $ChatMessageCopyWith<$Res> {
     @JsonKey(name: 'receiver_username') String receiverUsername,
     String content,
     DateTime timestamp,
+    @JsonKey(name: 'updated_at') DateTime? updatedAt,
     @JsonKey(name: 'is_encrypted') bool isEncrypted,
     bool isOptimistic,
   });
@@ -81,6 +84,7 @@ class _$ChatMessageCopyWithImpl<$Res, $Val extends ChatMessage>
     Object? receiverUsername = null,
     Object? content = null,
     Object? timestamp = null,
+    Object? updatedAt = freezed,
     Object? isEncrypted = null,
     Object? isOptimistic = null,
   }) {
@@ -106,6 +110,10 @@ class _$ChatMessageCopyWithImpl<$Res, $Val extends ChatMessage>
                 ? _value.timestamp
                 : timestamp // ignore: cast_nullable_to_non_nullable
                       as DateTime,
+            updatedAt: freezed == updatedAt
+                ? _value.updatedAt
+                : updatedAt // ignore: cast_nullable_to_non_nullable
+                      as DateTime?,
             isEncrypted: null == isEncrypted
                 ? _value.isEncrypted
                 : isEncrypted // ignore: cast_nullable_to_non_nullable
@@ -135,6 +143,7 @@ abstract class _$$ChatMessageImplCopyWith<$Res>
     @JsonKey(name: 'receiver_username') String receiverUsername,
     String content,
     DateTime timestamp,
+    @JsonKey(name: 'updated_at') DateTime? updatedAt,
     @JsonKey(name: 'is_encrypted') bool isEncrypted,
     bool isOptimistic,
   });
@@ -159,6 +168,7 @@ class __$$ChatMessageImplCopyWithImpl<$Res>
     Object? receiverUsername = null,
     Object? content = null,
     Object? timestamp = null,
+    Object? updatedAt = freezed,
     Object? isEncrypted = null,
     Object? isOptimistic = null,
   }) {
@@ -184,6 +194,10 @@ class __$$ChatMessageImplCopyWithImpl<$Res>
             ? _value.timestamp
             : timestamp // ignore: cast_nullable_to_non_nullable
                   as DateTime,
+        updatedAt: freezed == updatedAt
+            ? _value.updatedAt
+            : updatedAt // ignore: cast_nullable_to_non_nullable
+                  as DateTime?,
         isEncrypted: null == isEncrypted
             ? _value.isEncrypted
             : isEncrypted // ignore: cast_nullable_to_non_nullable
@@ -206,6 +220,7 @@ class _$ChatMessageImpl extends _ChatMessage {
     @JsonKey(name: 'receiver_username') required this.receiverUsername,
     required this.content,
     required this.timestamp,
+    @JsonKey(name: 'updated_at') this.updatedAt,
     @JsonKey(name: 'is_encrypted') this.isEncrypted = false,
     this.isOptimistic = false,
   }) : super._();
@@ -227,6 +242,9 @@ class _$ChatMessageImpl extends _ChatMessage {
   @override
   final DateTime timestamp;
   @override
+  @JsonKey(name: 'updated_at')
+  final DateTime? updatedAt;
+  @override
   @JsonKey(name: 'is_encrypted')
   final bool isEncrypted;
   @override
@@ -235,7 +253,7 @@ class _$ChatMessageImpl extends _ChatMessage {
 
   @override
   String toString() {
-    return 'ChatMessage(id: $id, senderUsername: $senderUsername, receiverUsername: $receiverUsername, content: $content, timestamp: $timestamp, isEncrypted: $isEncrypted, isOptimistic: $isOptimistic)';
+    return 'ChatMessage(id: $id, senderUsername: $senderUsername, receiverUsername: $receiverUsername, content: $content, timestamp: $timestamp, updatedAt: $updatedAt, isEncrypted: $isEncrypted, isOptimistic: $isOptimistic)';
   }
 
   @override
@@ -251,6 +269,8 @@ class _$ChatMessageImpl extends _ChatMessage {
             (identical(other.content, content) || other.content == content) &&
             (identical(other.timestamp, timestamp) ||
                 other.timestamp == timestamp) &&
+            (identical(other.updatedAt, updatedAt) ||
+                other.updatedAt == updatedAt) &&
             (identical(other.isEncrypted, isEncrypted) ||
                 other.isEncrypted == isEncrypted) &&
             (identical(other.isOptimistic, isOptimistic) ||
@@ -266,6 +286,7 @@ class _$ChatMessageImpl extends _ChatMessage {
     receiverUsername,
     content,
     timestamp,
+    updatedAt,
     isEncrypted,
     isOptimistic,
   );
@@ -291,6 +312,7 @@ abstract class _ChatMessage extends ChatMessage {
     @JsonKey(name: 'receiver_username') required final String receiverUsername,
     required final String content,
     required final DateTime timestamp,
+    @JsonKey(name: 'updated_at') final DateTime? updatedAt,
     @JsonKey(name: 'is_encrypted') final bool isEncrypted,
     final bool isOptimistic,
   }) = _$ChatMessageImpl;
@@ -312,6 +334,9 @@ abstract class _ChatMessage extends ChatMessage {
   String get content;
   @override
   DateTime get timestamp;
+  @override
+  @JsonKey(name: 'updated_at')
+  DateTime? get updatedAt;
   @override
   @JsonKey(name: 'is_encrypted')
   bool get isEncrypted;

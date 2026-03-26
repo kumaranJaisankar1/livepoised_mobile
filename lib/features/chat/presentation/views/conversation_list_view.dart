@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:timeago/timeago.dart' as timeago;
 import '../../../../core/utils/image_utils.dart';
 import '../controllers/chat_list_controller.dart';
-import '../../data/models/chat_connection.dart';
+import '../../data/models/inbox_item.dart';
 
 class ConversationListView extends GetView<ChatListController> {
   const ConversationListView({super.key});
@@ -15,24 +16,24 @@ class ConversationListView extends GetView<ChatListController> {
         title: const Text('Messages'),
       ),
       body: Obx(() {
-        if (controller.isLoading.value && controller.connections.isEmpty) {
+        if (controller.isLoading.value && controller.inboxItems.isEmpty) {
           return _buildShimmerList(context);
         }
 
-        if (controller.connections.isEmpty) {
+        if (controller.inboxItems.isEmpty) {
           return const Center(
-            child: Text('No connections found. Build your ally network to start chatting!'),
+            child: Text('No conversations found. Build your ally network to start chatting!'),
           );
         }
 
         return RefreshIndicator(
-          onRefresh: () => controller.fetchConnections(),
+          onRefresh: () => controller.fetchInbox(),
           child: ListView.separated(
-            itemCount: controller.connections.length,
+            itemCount: controller.inboxItems.length,
             separatorBuilder: (context, index) => const Divider(height: 1),
             itemBuilder: (context, index) {
-              final connection = controller.connections[index];
-              return _ConnectionTile(connection: connection);
+              final inboxItem = controller.inboxItems[index];
+              return _ConnectionTile(item: inboxItem);
             },
           ),
         );
@@ -80,33 +81,38 @@ class ConversationListView extends GetView<ChatListController> {
 }
 
 class _ConnectionTile extends StatelessWidget {
-  final ChatConnection connection;
+  final InboxItem item;
 
-  const _ConnectionTile({required this.connection});
+  const _ConnectionTile({required this.item});
 
   @override
   Widget build(BuildContext context) {
+    final title = '${item.otherUserFirstName ?? ""} ${item.otherUserLastName ?? ""}'.trim().isEmpty
+        ? item.otherUsername
+        : '${item.otherUserFirstName ?? ""} ${item.otherUserLastName ?? ""}';
+
     return ListTile(
       leading: CircleAvatar(
-        backgroundImage: ImageUtils.getImageProvider(connection.profileImage),
-        child: connection.profileImage == null || connection.profileImage!.isEmpty
-            ? Text(connection.firstName?[0] ?? connection.username[0].toUpperCase())
+        backgroundImage: ImageUtils.getImageProvider(item.otherUserImageUrl),
+        child: item.otherUserImageUrl == null || item.otherUserImageUrl!.isEmpty
+            ? Text(title[0].toUpperCase())
             : null,
       ),
       title: Text(
-        '${connection.firstName ?? ""} ${connection.lastName ?? ""}'.trim().isEmpty
-            ? connection.username
-            : '${connection.firstName ?? ""} ${connection.lastName ?? ""}',
+        title,
         style: const TextStyle(fontWeight: FontWeight.bold),
       ),
       subtitle: Text(
-        connection.connectionType?.toUpperCase() == 'CAREGIVER'
-            ? (connection.relationship ?? "")
-            : '${connection.connectionType ?? ""}  ${connection.relationship ?? ""}',
+        item.lastMessage ?? 'Started a conversation',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
         style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
       ),
-      trailing: const Icon(Icons.chevron_right),
-      onTap: () => Get.toNamed('/chat-history', arguments: connection),
+      trailing: Text(
+        timeago.format(item.timestamp, locale: 'en_short'),
+        style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
+      ),
+      onTap: () => Get.toNamed('/chat-history', arguments: item),
     );
   }
 }

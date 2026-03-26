@@ -4,8 +4,8 @@ import '../../../auth/auth_controller.dart';
 import '../../data/datasource/chat_service.dart';
 import '../../data/datasource/chat_websocket_service.dart';
 import '../../data/models/chat_message.dart';
-import '../../data/models/chat_connection.dart';
-
+import '../../data/models/inbox_item.dart';
+import 'chat_list_controller.dart';
 
 class ChatController extends GetxController {
   final ChatService _chatService = ChatService();
@@ -15,12 +15,12 @@ class ChatController extends GetxController {
   final messages = <ChatMessage>[].obs;
   final isLoadingHistory = false.obs;
   final ScrollController scrollController = ScrollController();
-  final connection = Rxn<ChatConnection>();
+  final inboxItem = Rxn<InboxItem>();
 
   String? get currentUsername => _authController.userProfile.value?.username;
 
   String? get otherUsername {
-    if (connection.value != null) return connection.value!.username;
+    if (inboxItem.value != null) return inboxItem.value!.otherUsername;
     final args = Get.arguments;
     if (args is String) return args;
     return null;
@@ -31,8 +31,15 @@ class ChatController extends GetxController {
     
     isLoadingHistory(true);
     try {
+      // 1. Initialize inbox chat first
+      await _chatService.startInbox(otherUser, currentUsername!);
+      
+      // 2. Fetch history
       final history = await _chatService.getChatHistory(currentUsername!, otherUser);
-      messages.assignAll(history.reversed); // Assuming history is chronologically ordered
+      
+      // Optional: merge logic could go here if WebSocket messages arrived while fetching
+      // but simpler to just assign and dedup any newly arrived via WebSocket Stream
+      messages.assignAll(history.reversed);
     } catch (e) {
       Get.snackbar('Error', 'Failed to load chat history');
     } finally {
@@ -55,33 +62,60 @@ class ChatController extends GetxController {
     
     // Insert at bottom (index 0 because ListView is reversed)
     messages.insert(0, tempMsg);
+    _refreshInbox();
 
     // 2. Send via WebSocket
     _wsService.sendMessage(content, receiverUsername);
   }
 
   void onIncomingMessage(ChatMessage msg) {
-    // Dedupe if it's an echo of our own message (same content and sender usually works for simple cases, 
-    // but proper ID mapping is better if the server sends back an ID)
-    // For now, if it's from me, we might already have it as optimistic
-    if (msg.senderUsername == currentUsername) {
-      // Find and replace optimistic message if needed, or just ignore if it's a simple echo
-      final optIndex = messages.indexWhere((m) => m.isOptimistic && m.content == msg.content);
-      if (optIndex != -1) {
-        messages[optIndex] = msg.copyWith(isOptimistic: false);
-        return;
-      }
+    // Only process messages for the currently open chat
+    if (msg.senderUsername != otherUsername && msg.receiverUsername != otherUsername) {
+      return;
+    }
+
+    // Deduplication Logic
+    // Exact ID Match
+    final exactMatchIndex = messages.indexWhere((m) => m.id == msg.id);
+    if (exactMatchIndex != -1) {
+      messages[exactMatchIndex] = msg;
+      _refreshInbox();
+      return;
+    }
+
+    // Content + Sender + Receiver + Time Match for Temp Messages
+    final optIndex = messages.indexWhere((m) => 
+      m.isOptimistic && 
+      m.id.startsWith('temp-') &&
+      m.content == msg.content && 
+      m.senderUsername == msg.senderUsername && 
+      m.receiverUsername == msg.receiverUsername &&
+      m.timestamp.difference(msg.timestamp).inSeconds.abs() <= 5
+    );
+    
+    if (optIndex != -1) {
+      messages[optIndex] = msg;
+      _refreshInbox();
+      return;
     }
     
+    // No match found, append to history
     messages.insert(0, msg);
+    _refreshInbox();
+  }
+
+  void _refreshInbox() {
+    if (Get.isRegistered<ChatListController>()) {
+      Get.find<ChatListController>().fetchInbox();
+    }
   }
 
   @override
   void onInit() {
     super.onInit();
     final args = Get.arguments;
-    if (args is ChatConnection) {
-      connection.value = args;
+    if (args is InboxItem) {
+      inboxItem.value = args;
     }
 
     final String? otherUser = otherUsername;

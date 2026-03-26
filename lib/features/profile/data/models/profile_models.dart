@@ -1,15 +1,15 @@
 class ProfileResponse {
   final UserProfileFull userProfile;
-  final PersonalDetails personalDetails;
-  final Address address;
+  final PersonalDetails? personalDetails;
+  final Address? address;
   final int forumPostsCount;
   final int helpfulResponsesCount;
   final LoginDetails? loginDetails;
 
   ProfileResponse({
     required this.userProfile,
-    required this.personalDetails,
-    required this.address,
+    this.personalDetails,
+    this.address,
     required this.forumPostsCount,
     required this.helpfulResponsesCount,
     this.loginDetails,
@@ -18,8 +18,8 @@ class ProfileResponse {
   factory ProfileResponse.fromJson(Map<String, dynamic> json) {
     return ProfileResponse(
       userProfile: UserProfileFull.fromJson(json['userProfile']),
-      personalDetails: PersonalDetails.fromJson(json['personalDetails']),
-      address: Address.fromJson(json['address']),
+      personalDetails: json['personalDetails'] != null ? PersonalDetails.fromJson(json['personalDetails']) : null,
+      address: json['address'] != null ? Address.fromJson(json['address']) : null,
       forumPostsCount: json['forumPostsCount'] ?? 0,
       helpfulResponsesCount: json['helpfulResponsesCount'] ?? 0,
       loginDetails: json['loginDetails'] != null ? LoginDetails.fromJson(json['loginDetails']) : null,
@@ -29,8 +29,8 @@ class ProfileResponse {
   Map<String, dynamic> toJson() {
     return {
       'userProfile': userProfile.toJson(),
-      'personalDetails': personalDetails.toJson(),
-      'address': address.toJson(),
+      'personalDetails': personalDetails?.toJson(),
+      'address': address?.toJson(),
       'forumPostsCount': forumPostsCount,
       'helpfulResponsesCount': helpfulResponsesCount,
       'loginDetails': loginDetails?.toJson(),
