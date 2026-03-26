@@ -101,7 +101,7 @@ class AuthService {
       // google_sign_in v6 API - exposes accessToken needed for Keycloak Token Exchange
       final GoogleSignIn googleSignIn = GoogleSignIn(
         scopes: ['email', 'profile'],
-        serverClientId: '1044735544019-oakt4j9pb0ob7dkd5oe3urtfspivanu5.apps.googleusercontent.com',
+        serverClientId: dotenv.get('GOOGLE_SERVER_CLIENT_ID'),
       );
 
       // 1. Trigger Google login

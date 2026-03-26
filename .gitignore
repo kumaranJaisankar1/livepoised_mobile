@@ -38,7 +38,7 @@ migrate_working_dir/
 /android/key.properties
 
 # Environment variables
-.env*
+.env
 
 # Temporary files & scripts
 get_color.py
