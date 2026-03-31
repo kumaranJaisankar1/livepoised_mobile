@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
@@ -99,14 +100,26 @@ class AuthService {
       developer.log('Starting Native Google Sign-In...');
 
       // google_sign_in v6 API - exposes accessToken needed for Keycloak Token Exchange
+      final String serverClientId = dotenv.get('GOOGLE_SERVER_CLIENT_ID');
+      final String? iosClientId = Platform.isIOS ? dotenv.get('GOOGLE_IOS_CLIENT_ID') : null;
+      
       final GoogleSignIn googleSignIn = GoogleSignIn(
+        clientId: iosClientId,
         scopes: ['email', 'profile'],
-        serverClientId: dotenv.get('GOOGLE_SERVER_CLIENT_ID'),
+        serverClientId: serverClientId,
       );
 
       // 1. Trigger Google login
-      // Sign out first to clear cached session and force account picker to appear
-      await googleSignIn.signOut();
+      developer.log('Google Auth Config: clientId: $iosClientId, serverClientId: $serverClientId');
+      
+      try {
+        developer.log('Google Auth: Attempting legacy signOut to clear session...');
+        await googleSignIn.signOut();
+      } catch (e) {
+        developer.log('Google Auth: signOut failed (not a critical error): $e');
+      }
+
+      developer.log('Google Auth: Starting Native signIn overlay...');
       final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
       if (googleUser == null) {
         developer.log('Google sign-in was cancelled by the user');

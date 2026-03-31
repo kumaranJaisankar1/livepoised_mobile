@@ -19,7 +19,9 @@ class PushNotificationService {
   final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
 
   Future<void> initialize() async {
+    print('PNS: Starting initialization');
     // 1. Request permissions (especially for iOS)
+    print('PNS: Requesting FCM permission...');
     NotificationSettings settings = await _fcm.requestPermission(
       alert: true,
       badge: true,
@@ -33,13 +35,18 @@ class PushNotificationService {
     // 2. Initialize Local Notifications for Foreground
     const AndroidInitializationSettings androidSettings =
         AndroidInitializationSettings('@mipmap/ic_launcher');
-    const DarwinInitializationSettings iosSettings = DarwinInitializationSettings();
+    const DarwinInitializationSettings iosSettings = DarwinInitializationSettings(
+      requestAlertPermission: false,
+      requestBadgePermission: false,
+      requestSoundPermission: false,
+    );
 
     const InitializationSettings initSettings = InitializationSettings(
       android: androidSettings,
       iOS: iosSettings,
     );
 
+    print('PNS: Initializing local notifications...');
     await _localNotifications.initialize(
       initSettings,
       onDidReceiveNotificationResponse: (NotificationResponse response) {
@@ -50,6 +57,7 @@ class PushNotificationService {
       },
     );
 
+    print('PNS: Setting up FCM message listeners...');
     // 3. Handle Foreground Messages
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       print('Got a message whilst in the foreground!');
@@ -68,11 +76,17 @@ class PushNotificationService {
     });
 
     // 5. Check for Terminated State Launch
-    RemoteMessage? initialMessage = await _fcm.getInitialMessage();
-    if (initialMessage != null) {
-      print('Notification clicked (Terminated stage)');
-      handleNavigation(initialMessage.data);
-    }
+    print('PNS: Getting initial FCM message...');
+    _fcm.getInitialMessage().then((RemoteMessage? initialMessage) {
+      if (initialMessage != null) {
+        print('Notification clicked (Terminated stage)');
+        handleNavigation(initialMessage.data);
+      }
+    }).catchError((e) {
+      print('PNS Error: Failed to get initial message: $e');
+    });
+    
+    print('PNS: Initialization complete');
   }
 
   void _showLocalNotification(RemoteNotification notification, Map<String, dynamic> data) {

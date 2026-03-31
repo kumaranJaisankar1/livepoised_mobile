@@ -63,6 +63,6 @@ class DefaultFirebaseOptions {
     messagingSenderId: '1044735544019',
     projectId: 'livepoiseddev',
     storageBucket: 'livepoiseddev.firebasestorage.app',
-    iosBundleId: 'com.livepoised.app.livepoisedMobile',
+    iosBundleId: 'com.livepoised.app.livepoisedmobile',
   );
 }
