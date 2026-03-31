@@ -59,10 +59,13 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyBlSO39OFVsToK8tq41J4M0CyinDsWaVvU',
-    appId: '1:1044735544019:ios:d1569a64443357ebbbe226',
+    appId: '1:1044735544019:ios:107c84661303d56fbbe226',
     messagingSenderId: '1044735544019',
     projectId: 'livepoiseddev',
     storageBucket: 'livepoiseddev.firebasestorage.app',
+    androidClientId: '1044735544019-p5kamj65bur9ns9ss30ldp223cstdn0t.apps.googleusercontent.com',
+    iosClientId: '1044735544019-31fkemvobkdlpomkrk4honomovld40sv.apps.googleusercontent.com',
     iosBundleId: 'com.livepoised.app.livepoisedmobile',
   );
+
 }

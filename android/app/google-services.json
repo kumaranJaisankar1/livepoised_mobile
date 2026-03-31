@@ -12,7 +12,12 @@
           "package_name": "com.livepoised.app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "1044735544019-oakt4j9pb0ob7dkd5oe3urtfspivanu5.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyA3PKkGid2d5HkYyzVeMbb-mgG7_HQQmgc"
@@ -20,7 +25,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1044735544019-oakt4j9pb0ob7dkd5oe3urtfspivanu5.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "1044735544019-31fkemvobkdlpomkrk4honomovld40sv.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.livepoised.app.livepoisedmobile"
+              }
+            }
+          ]
         }
       }
     }
