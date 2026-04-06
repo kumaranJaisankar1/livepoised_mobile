@@ -63,9 +63,10 @@ class DefaultFirebaseOptions {
     messagingSenderId: '1044735544019',
     projectId: 'livepoiseddev',
     storageBucket: 'livepoiseddev.firebasestorage.app',
-    androidClientId: '1044735544019-p5kamj65bur9ns9ss30ldp223cstdn0t.apps.googleusercontent.com',
-    iosClientId: '1044735544019-31fkemvobkdlpomkrk4honomovld40sv.apps.googleusercontent.com',
-    iosBundleId: 'com.livepoised.app.livepoisedmobile',
+    androidClientId:
+        '1044735544019-p5kamj65bur9ns9ss30ldp223cstdn0t.apps.googleusercontent.com',
+    iosClientId:
+        '1044735544019-31fkemvobkdlpomkrk4honomovld40sv.apps.googleusercontent.com',
+    iosBundleId: 'com.livepoised.app',
   );
-
 }
