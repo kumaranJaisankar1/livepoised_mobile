@@ -13,26 +13,66 @@ class ConversationListView extends GetView<ChatListController> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Messages'),
+        leading: Obx(() => controller.isSearchActive.value
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => controller.toggleSearch(),
+              )
+            : Icon(Icons.message_outlined)),
+        title: Obx(() => controller.isSearchActive.value
+            ? TextField(
+                controller: controller.searchTextController,
+                onChanged: (value) => controller.updateSearch(value),
+                autofocus: true,
+                style: const TextStyle(fontSize: 16),
+                decoration: const InputDecoration(
+                  hintText: 'Search conversations...',
+                  border: InputBorder.none,
+                ),
+              )
+            : const Text('Messages')),
+        actions: [
+          Obx(() => controller.isSearchActive.value
+              ? (controller.searchQuery.value.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: () => controller.clearSearch(),
+                    )
+                  : const SizedBox.shrink())
+              : IconButton(
+                  icon: const Icon(Icons.search),
+                  onPressed: () => controller.toggleSearch(),
+                )),
+        ],
       ),
       body: Obx(() {
         if (controller.isLoading.value && controller.inboxItems.isEmpty) {
           return _buildShimmerList(context);
         }
 
-        if (controller.inboxItems.isEmpty) {
-          return const Center(
-            child: Text('No conversations found. Build your ally network to start chatting!'),
+        final items = controller.filteredInboxItems;
+        if (items.isEmpty) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Text(
+                controller.searchQuery.value.isEmpty
+                    ? 'No conversations found. Build your ally network to start chatting!'
+                    : 'No conversations match your search.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Theme.of(context).hintColor),
+              ),
+            ),
           );
         }
 
         return RefreshIndicator(
           onRefresh: () => controller.fetchInbox(),
           child: ListView.separated(
-            itemCount: controller.inboxItems.length,
+            itemCount: items.length,
             separatorBuilder: (context, index) => const Divider(height: 1),
             itemBuilder: (context, index) {
-              final inboxItem = controller.inboxItems[index];
+              final inboxItem = items[index];
               return _ConnectionTile(item: inboxItem);
             },
           ),

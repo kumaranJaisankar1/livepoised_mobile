@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../auth/auth_controller.dart';
 import '../../data/datasource/chat_service.dart';
@@ -9,6 +10,49 @@ class ChatListController extends GetxController {
   
   final inboxItems = <InboxItem>[].obs;
   final isLoading = false.obs;
+  final isSearchActive = false.obs;
+  final searchQuery = ''.obs;
+  final searchTextController = TextEditingController();
+
+  List<InboxItem> get filteredInboxItems {
+    if (searchQuery.value.isEmpty) {
+      return inboxItems;
+    }
+    final query = searchQuery.value.toLowerCase();
+    return inboxItems.where((item) {
+      final firstName = item.otherUserFirstName?.toLowerCase() ?? '';
+      final lastName = item.otherUserLastName?.toLowerCase() ?? '';
+      final username = item.otherUsername.toLowerCase();
+      final fullName = '$firstName $lastName'.toLowerCase();
+      
+      return firstName.contains(query) || 
+             lastName.contains(query) || 
+             username.contains(query) ||
+             fullName.contains(query);
+    }).toList();
+  }
+
+  void updateSearch(String query) {
+    searchQuery.value = query;
+  }
+
+  void toggleSearch() {
+    isSearchActive.value = !isSearchActive.value;
+    if (!isSearchActive.value) {
+      clearSearch();
+    }
+  }
+
+  void clearSearch() {
+    searchQuery.value = '';
+    searchTextController.clear();
+  }
+
+  @override
+  void onClose() {
+    searchTextController.dispose();
+    super.onClose();
+  }
 
   @override
   void onInit() {

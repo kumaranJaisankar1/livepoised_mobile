@@ -21,9 +21,16 @@ class ProfileView extends GetView<ProfileController> {
 
         final profile = controller.profileData.value;
         if (profile == null) {
-          return const Center(child: Row(children: [CircularProgressIndicator(
-            strokeWidth: 2.5
-          ),Text("loading profile...")],));
+          return const Center(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircularProgressIndicator(strokeWidth: 2.5),
+                SizedBox(width: 12),
+                Text("loading profile..."),
+              ],
+            ),
+          );
         }
 
         final theme = Theme.of(context);
