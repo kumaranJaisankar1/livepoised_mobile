@@ -21,6 +21,8 @@ class _MemoryRecallGameViewState extends State<MemoryRecallGameView> {
   bool isShowingSequence = false;
   bool isGameOver = false;
   int level = 1;
+  int remainingSeconds = 10;
+  Timer? _memorizationTimer;
 
   @override
   void initState() {
@@ -34,21 +36,37 @@ class _MemoryRecallGameViewState extends State<MemoryRecallGameView> {
       userSequence = [];
       isShowingSequence = true;
       isGameOver = false;
+      remainingSeconds = 10;
     });
 
     await Future.delayed(const Duration(milliseconds: 1000));
     _showSequence();
   }
 
-  void _showSequence() async {
-    // In a real implementation, we would animate each icon. 
-    // For this MVP, we show them for a duration then hide.
-    await Future.delayed(Duration(milliseconds: 1000 + (level * 200)));
-    if (mounted) {
-      setState(() {
-        isShowingSequence = false;
-      });
-    }
+  void _showSequence() {
+    _startMemorizationTimer();
+  }
+
+  void _startMemorizationTimer() {
+    _memorizationTimer?.cancel();
+    _memorizationTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (mounted) {
+        setState(() {
+          if (remainingSeconds > 0) {
+            remainingSeconds--;
+          } else {
+            _memorizationTimer?.cancel();
+            isShowingSequence = false;
+          }
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _memorizationTimer?.cancel();
+    super.dispose();
   }
 
   void _onIconTap(int index) {
@@ -200,9 +218,25 @@ class _MemoryRecallGameViewState extends State<MemoryRecallGameView> {
             color: theme.colorScheme.primary.withOpacity(0.1),
             borderRadius: BorderRadius.circular(20),
           ),
-          child: Text(
-            isShowingSequence ? "MEMORIZE THE SEQUENCE" : "RECALL THE SEQUENCE",
-            style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.1, fontSize: 12, color: theme.colorScheme.primary),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (isShowingSequence) ...[
+                Icon(Icons.timer_outlined, size: 14, color: theme.colorScheme.primary),
+                const SizedBox(width: 6),
+                Text(
+                  "${remainingSeconds}s",
+                  style: TextStyle(fontWeight: FontWeight.bold, color: theme.colorScheme.primary, fontSize: 12),
+                ),
+                const SizedBox(width: 8),
+                Container(width: 1, height: 12, color: theme.colorScheme.primary.withOpacity(0.3)),
+                const SizedBox(width: 8),
+              ],
+              Text(
+                isShowingSequence ? "MEMORIZE THE SEQUENCE" : "RECALL THE SEQUENCE",
+                style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.1, fontSize: 12, color: theme.colorScheme.primary),
+              ),
+            ],
           ),
         ),
       ],

@@ -15,20 +15,49 @@ class ProfileView extends GetView<ProfileController> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Obx(() {
+        final authController = Get.find<AuthController>();
+        
+        // Show nothing or a simple message if we're logging out or not logged in
+        if (!authController.isLoggedIn.value) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
         if (controller.isLoading.value) {
           return _buildLoadingShimmer(context);
         }
 
         final profile = controller.profileData.value;
         if (profile == null) {
-          return const Center(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                CircularProgressIndicator(strokeWidth: 2.5),
-                SizedBox(width: 12),
-                Text("loading profile..."),
-              ],
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.error_outline, size: 64, color: Theme.of(context).colorScheme.error.withOpacity(0.5)),
+                  const SizedBox(height: 16),
+                  Text(
+                    "Couldn't load profile",
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    "Please check your internet connection and try again.",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton.icon(
+                    onPressed: () => controller.refreshProfile(),
+                    icon: const Icon(Icons.refresh),
+                    label: const Text("Try Again"),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ],
+              ),
             ),
           );
         }

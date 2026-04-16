@@ -25,6 +25,7 @@ import '../features/network/presentation/controllers/network_controller.dart';
 import '../features/neuro_wellness/presentation/views/neuro_wellness_lobby_view.dart';
 import '../features/neuro_wellness/presentation/controllers/neuro_wellness_controller.dart';
 import '../features/neuro_wellness/presentation/views/memory_recall_game_view.dart';
+import '../features/neuro_wellness/presentation/views/zen_flow_view.dart';
 
 class AppPages {
   static const initial = '/splash';
@@ -124,6 +125,11 @@ class AppPages {
     GetPage(
       name: '/neuro-wellness/memory-recall',
       page: () => const MemoryRecallGameView(),
+      middlewares: [AuthMiddleware()],
+    ),
+    GetPage(
+      name: '/neuro-wellness/zen-flow',
+      page: () => const ZenFlowView(),
       middlewares: [AuthMiddleware()],
     ),
   ];

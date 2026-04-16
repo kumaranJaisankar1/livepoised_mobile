@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'auth_service.dart';
@@ -125,7 +126,36 @@ class AuthController extends GetxController {
   }
 
   Future<void> logout() async {
-    isLoading.value = true;
+    // Show loading dialog manually for better control over dismissal
+    Get.dialog(
+      PopScope(
+        canPop: false,
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(color: Colors.white),
+                const SizedBox(height: 16),
+                const Text(
+                  "Signing out...",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    decoration: TextDecoration.none,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      barrierDismissible: false,
+      barrierColor: Colors.black.withOpacity(0.3),
+    );
+
     try {
       // Clear all data caches in controllers
       if (Get.isRegistered<ProfileController>()) {
@@ -157,7 +187,10 @@ class AuthController extends GetxController {
     } catch (e) {
       print("Logout error: $e");
     } finally {
-      isLoading.value = false;
+      // Close dialog if it's still open
+      if (Get.isDialogOpen ?? false) {
+        Get.back();
+      }
       Get.offAllNamed('/login');
     }
   }

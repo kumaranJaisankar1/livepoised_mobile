@@ -7,6 +7,8 @@ class NeuroWellnessController extends GetxController {
   void startGame(String gameId) {
     if (gameId == 'memory_recall') {
       Get.toNamed('/neuro-wellness/memory-recall');
+    } else if (gameId == 'zen_flow') {
+      Get.toNamed('/neuro-wellness/zen-flow');
     } else {
       Get.snackbar("Coming Soon", "This game is currently under development.");
     }

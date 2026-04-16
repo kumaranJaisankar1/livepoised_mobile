@@ -96,10 +96,13 @@ class ProfileController extends GetxController {
 
   Future<void> refreshProfile() async {
     final username = _authController.userProfile.value?.username;
-    if (username == null) return;
+    if (username == null) {
+      isLoading(false);
+      return;
+    }
     
     try {
-      if (profileData.value == null) isLoading(true);
+      isLoading(true);
       
       // Fetch core profile, image, and connections in parallel
       final results = await Future.wait([
@@ -131,6 +134,7 @@ class ProfileController extends GetxController {
   }
 
   void clearData() {
+    isLoading(false);
     profileData.value = null;
     userImage.value = "";
     connectionsCount.value = 0;
