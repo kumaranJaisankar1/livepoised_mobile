@@ -86,8 +86,12 @@ class FeedController extends GetxController {
   }
 
   Future<void> likePost(dynamic postId) async {
+    debugPrint('FeedController: likePost() called for post: $postId');
     final index = posts.indexWhere((p) => p.id == postId);
-    if (index == -1) return;
+    if (index == -1) {
+      debugPrint('FeedController: Post not found in list: $postId');
+      return;
+    }
 
     final originalPost = posts[index];
     

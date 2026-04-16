@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:livepoised_mobile/features/feed/data/models/comment.dart';
 import 'package:livepoised_mobile/features/feed/data/models/post.dart';
@@ -74,7 +75,11 @@ class PostDetailsController extends GetxController {
   }
 
   Future<void> likePost() async {
-    if (post.value == null || isLiking.value) return;
+    debugPrint('PostDetailsController: likePost() called');
+    if (post.value == null || isLiking.value) {
+      debugPrint('PostDetailsController: likePost early return (post null or already liking)');
+      return;
+    }
 
     final currentPost = post.value!;
     // Optimistic update

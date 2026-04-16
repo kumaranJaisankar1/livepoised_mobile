@@ -198,6 +198,38 @@ class AuthController extends GetxController {
     }
   }
 
+  Future<void> loginWithApple() async {
+    isLoading.value = true;
+    try {
+      final success = await _authService.signInWithSocialProvider('apple');
+      print('Apple Login Success: $success');
+      if (success) {
+        await _authService.syncWithBackend();
+        final profile = await _storage.getUserProfile();
+        userProfile.value = profile;
+        isLoggedIn.value = true;
+        _fetchInitialData();
+        Get.offAllNamed('/');
+      } else {
+        Get.snackbar('Login Failed', 'Apple login returned empty result. Check logs for details.',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.redAccent,
+          colorText: Colors.white,
+        );
+      }
+    } catch (e) {
+      print('Apple Login Controller Error: $e');
+      Get.snackbar('Apple Login Error', e.toString(),
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.redAccent,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 8),
+      );
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
   Future<void> handleSocialAuthCallback(String code) async {
     isLoading.value = true;
     try {

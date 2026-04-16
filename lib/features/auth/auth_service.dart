@@ -4,13 +4,13 @@ import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_appauth/flutter_appauth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:livepoised_mobile/core/storage/secure_storage_service.dart';
 import 'package:livepoised_mobile/core/constants/api_endpoints.dart';
 import 'package:livepoised_mobile/core/network/dio_client.dart';
 import 'package:livepoised_mobile/core/models/user_model.dart';
 import 'dart:developer' as developer;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-
 
 class AuthService {
   final Dio _dio = DioClient().springBoot;
@@ -29,9 +29,7 @@ class AuthService {
           'password': password,
           'scope': 'openid profile email offline_access',
         },
-        options: Options(
-          contentType: Headers.formUrlEncodedContentType,
-        ),
+        options: Options(contentType: Headers.formUrlEncodedContentType),
       );
 
       if (response.statusCode == 200) {
@@ -84,13 +82,14 @@ class AuthService {
     }
   }
 
-
-
   Future<bool> signInWithSocialProvider(String provider) async {
     if (provider.toLowerCase() == 'google') {
       return _signInWithGoogleNative();
     }
-    
+    if (provider.toLowerCase() == 'apple') {
+      return _signInWithAppleNative();
+    }
+
     // Fallback or other providers can still use browser flow if needed in the future
     throw UnsupportedError('Only native google login is supported currently.');
   }
@@ -101,8 +100,10 @@ class AuthService {
 
       // google_sign_in v6 API - exposes accessToken needed for Keycloak Token Exchange
       final String serverClientId = dotenv.get('GOOGLE_SERVER_CLIENT_ID');
-      final String? iosClientId = Platform.isIOS ? dotenv.get('GOOGLE_IOS_CLIENT_ID') : null;
-      
+      final String? iosClientId = Platform.isIOS
+          ? dotenv.get('GOOGLE_IOS_CLIENT_ID')
+          : null;
+
       final GoogleSignIn googleSignIn = GoogleSignIn(
         clientId: iosClientId,
         scopes: ['email', 'profile'],
@@ -110,10 +111,14 @@ class AuthService {
       );
 
       // 1. Trigger Google login
-      developer.log('Google Auth Config: clientId: $iosClientId, serverClientId: $serverClientId');
-      
+      developer.log(
+        'Google Auth Config: clientId: $iosClientId, serverClientId: $serverClientId',
+      );
+
       try {
-        developer.log('Google Auth: Attempting legacy signOut to clear session...');
+        developer.log(
+          'Google Auth: Attempting legacy signOut to clear session...',
+        );
         await googleSignIn.signOut();
       } catch (e) {
         developer.log('Google Auth: signOut failed (not a critical error): $e');
@@ -129,7 +134,8 @@ class AuthService {
       developer.log('Google User Authenticated: ${googleUser.email}');
 
       // 2. Get tokens — v6 exposes both accessToken and idToken
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
       final String? accessToken = googleAuth.accessToken;
 
       if (accessToken == null) {
@@ -137,7 +143,9 @@ class AuthService {
         return false;
       }
 
-      developer.log('Google Access Token retrieved. Exchanging with Keycloak...');
+      developer.log(
+        'Google Access Token retrieved. Exchanging with Keycloak...',
+      );
 
       // 3. Token Exchange with Keycloak using the real Google Access Token
       final response = await _dio.post(
@@ -151,9 +159,7 @@ class AuthService {
           'client_secret': dotenv.get('CLIENT_SECRET'),
           'scope': 'openid profile email offline_access',
         },
-        options: Options(
-          contentType: Headers.formUrlEncodedContentType,
-        ),
+        options: Options(contentType: Headers.formUrlEncodedContentType),
       );
 
       // 4. Parse and store Keycloak tokens
@@ -169,15 +175,94 @@ class AuthService {
         );
         return true;
       }
-      developer.log('Keycloak token exchange failed with status: \${response.statusCode}');
+      developer.log(
+        'Keycloak token exchange failed with status: ${response.statusCode}',
+      );
       return false;
-
     } on DioException catch (e) {
       final message = e.response?.data?['error_description'] ?? e.message;
-      developer.log('Keycloak Token Exchange DioError: \$message');
+      developer.log('Keycloak Token Exchange DioError: $message');
       throw message;
     } catch (e) {
-      developer.log('Google Sign-In Error: \$e');
+      developer.log('Google Sign-In Error: $e');
+      rethrow;
+    }
+  }
+
+  Future<bool> _signInWithAppleNative() async {
+    try {
+      developer.log('Starting Native Apple Sign-In...');
+
+      final AuthorizationCredentialAppleID credential =
+          await SignInWithApple.getAppleIDCredential(
+            scopes: [
+              AppleIDAuthorizationScopes.email,
+              AppleIDAuthorizationScopes.fullName,
+            ],
+          );
+
+      final String? identityToken = credential.identityToken;
+      if (identityToken == null) {
+        developer.log('Failed to retrieve Apple Identity Token.');
+        return false;
+      }
+
+      developer.log(
+        'Apple Identity Token retrieved. Exchanging with Keycloak...',
+      );
+
+      // Token Exchange with Keycloak using the Apple Identity Token
+      final response = await _dio.post(
+        ApiEndpoints.tokenEndpoint,
+        data: {
+          'client_id': ApiEndpoints.clientId,
+          'grant_type': 'urn:ietf:params:oauth:grant-type:token-exchange',
+          'subject_token': identityToken,
+          'subject_token_type':
+              'urn:ietf:params:oauth:token-type:id_token', // OIDC ID Token is accepted here
+          'subject_issuer': 'apple',
+          'client_secret': dotenv.get('CLIENT_SECRET'),
+          'scope': 'openid name email',
+          'user_profile': {
+            "name": {
+              "firstName": credential.givenName,
+              "lastName": credential.familyName,
+            },
+            "email": credential.email,
+          },
+        },
+        options: Options(contentType: Headers.formUrlEncodedContentType),
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data;
+        developer.log('Keycloak Token Exchange for Apple successful');
+        final userProfile = _parseUserProfileFromIdToken(data['id_token']);
+        await _storage.saveTokens(
+          accessToken: data['access_token'],
+          refreshToken: data['refresh_token'],
+          idToken: data['id_token'],
+          userProfile: userProfile,
+        );
+        return true;
+      }
+      developer.log(
+        'Keycloak token exchange for Apple failed with status: ${response.statusCode}',
+      );
+      return false;
+    } on SignInWithAppleAuthorizationException catch (e) {
+      if (e.code == AuthorizationErrorCode.canceled) {
+        developer.log('Apple sign-in was cancelled by the user');
+        return false;
+      }
+      developer.log('Apple Sign-In Error (Native): ${e.message}');
+      rethrow;
+    } on DioException catch (e) {
+      final message = e.response?.data?['error_description'] ?? e.message;
+      developer.log('Keycloak Token Exchange (Apple) DioError: $message');
+      throw message;
+    } catch (e) {
+      developer.log('Apple Sign-In Error: $e');
       rethrow;
     }
   }
@@ -187,9 +272,11 @@ class AuthService {
     try {
       final parts = idToken.split('.');
       if (parts.length < 2) return null;
-      final payload = utf8.decode(base64Url.decode(base64Url.normalize(parts[1])));
+      final payload = utf8.decode(
+        base64Url.decode(base64Url.normalize(parts[1])),
+      );
       final data = json.decode(payload);
-      
+
       // Ensure we mapping Keycloak standard claims to our model
       return UserModel.fromJson({
         'sub': data['sub'],
@@ -212,11 +299,7 @@ class AuthService {
     try {
       final response = await _dio.post(
         ApiEndpoints.googleSync,
-        options: Options(
-          headers: {
-            'Authorization': 'Bearer $token',
-          },
-        ),
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
@@ -247,9 +330,7 @@ class AuthService {
           'grant_type': 'refresh_token',
           'refresh_token': refreshToken,
         },
-        options: Options(
-          contentType: Headers.formUrlEncodedContentType,
-        ),
+        options: Options(contentType: Headers.formUrlEncodedContentType),
       );
 
       if (response.statusCode == 200) {
@@ -273,12 +354,12 @@ class AuthService {
   String getSocialLoginUrl(String provider) {
     // Standard OIDC Authorization Flow for Social Login
     const verifier = 'livepoised_social_auth_verifier_consistent';
-    
+
     // Generate S256 Challenge
     final bytes = utf8.encode(verifier);
     final digest = sha256.convert(bytes);
     final challenge = base64Url.encode(digest.bytes).replaceAll('=', '');
-    
+
     return '${ApiEndpoints.authEndpoint}'
         '?client_id=${ApiEndpoints.clientId}'
         '&response_type=code'
@@ -303,9 +384,7 @@ class AuthService {
           'code_verifier': verifier,
           'redirect_uri': ApiEndpoints.redirectUri,
         },
-        options: Options(
-          contentType: Headers.formUrlEncodedContentType,
-        ),
+        options: Options(contentType: Headers.formUrlEncodedContentType),
       );
 
       if (response.statusCode == 200) {
@@ -338,9 +417,7 @@ class AuthService {
             'client_secret': dotenv.get('CLIENT_SECRET'),
             'refresh_token': refreshToken,
           },
-          options: Options(
-            contentType: Headers.formUrlEncodedContentType,
-          ),
+          options: Options(contentType: Headers.formUrlEncodedContentType),
         );
         developer.log('Keycloak session successfully terminated');
       }
@@ -351,7 +428,6 @@ class AuthService {
         await googleSignIn.signOut();
         developer.log('Google Sign-Out successful');
       } catch (_) {}
-
     } catch (e) {
       developer.log('Server Logout Error: $e');
     } finally {
@@ -362,12 +438,12 @@ class AuthService {
   String getRegistrationUrl() {
     // S256 PKCE is required by the Keycloak server configuration
     const verifier = 'livepoised_registration_verifier_consistent_for_webview';
-    
+
     // Generate S256 Challenge
     final bytes = utf8.encode(verifier);
     final digest = sha256.convert(bytes);
     final challenge = base64Url.encode(digest.bytes).replaceAll('=', '');
-    
+
     return '${ApiEndpoints.registrationEndpoint}'
         '?client_id=${ApiEndpoints.clientId}'
         '&response_type=code'

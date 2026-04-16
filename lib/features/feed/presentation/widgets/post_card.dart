@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:ui';
 import 'package:any_link_preview/any_link_preview.dart';
 import 'package:get/get.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/utils/image_utils.dart';
 import '../../data/models/post.dart';
 import 'package:timeago/timeago.dart' as timeago;
@@ -102,17 +103,13 @@ class PostCard extends StatelessWidget {
                   icon: post.isLiked ? Icons.favorite : Icons.favorite_border,
                   label: '${post.likes}',
                   color: post.isLiked ? Colors.red : null,
-                  onTap: (e) {
-                    onLike();
-                  },
+                  onTap: onLike,
                 ),
                 const SizedBox(width: 24),
                 _ActionButton(
                   icon: Icons.chat_bubble_outline,
                   label: '${post.commentsCount}',
-                  onTap: (e) {
-                    onReply();
-                  },
+                  onTap: onReply,
                 ),
                 const Spacer(),
                 IconButton(
@@ -161,85 +158,94 @@ class _CustomLinkPreview extends StatelessWidget {
       ),
       errorWidget: const SizedBox.shrink(),
       itemBuilder: (context, metadata, imageProvider, _) {
-        return ClipRRect(
+        return InkWell(
+          onTap: () async {
+            final uri = Uri.tryParse(url);
+            if (uri != null && await canLaunchUrl(uri)) {
+              await launchUrl(uri, mode: LaunchMode.externalApplication);
+            }
+          },
           borderRadius: BorderRadius.circular(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Image Section
-              AspectRatio(
-                aspectRatio: 16 / 9,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    // Blurred background
-                    if (imageProvider != null) ...[
-                      Image(image: imageProvider, fit: BoxFit.cover),
-                      BackdropFilter(
-                        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                        child: Container(
-                          color: (isDark ? Colors.black : Colors.white).withOpacity(0.2),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Image Section
+                AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      // Blurred background
+                      if (imageProvider != null) ...[
+                        Image(image: imageProvider, fit: BoxFit.cover),
+                        BackdropFilter(
+                          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                          child: Container(
+                            color: (isDark ? Colors.black : Colors.white).withOpacity(0.2),
+                          ),
                         ),
-                      ),
-                    ] else
-                      Container(color: colorScheme.surfaceVariant),
+                      ] else
+                        Container(color: colorScheme.surfaceVariant),
 
-                    // Centered contain image
-                    if (imageProvider != null)
-                      Image(image: imageProvider, fit: BoxFit.contain),
-                    
-                    // Centered Play Button for Video
-                    if (isVideo)
-                      Center(
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.4),
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white.withOpacity(0.5), width: 1.5),
-                          ),
-                          child: const Icon(
-                            Icons.play_arrow_rounded,
-                            color: Colors.white,
-                            size: 44,
+                      // Centered contain image
+                      if (imageProvider != null)
+                        Image(image: imageProvider, fit: BoxFit.contain),
+                      
+                      // Centered Play Button for Video
+                      if (isVideo)
+                        Center(
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.4),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white.withOpacity(0.5), width: 1.5),
+                            ),
+                            child: const Icon(
+                              Icons.play_arrow_rounded,
+                              color: Colors.white,
+                              size: 44,
+                            ),
                           ),
                         ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              
-              // Title & Description Bar
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                color: isDark ? colorScheme.surfaceVariant : colorScheme.primaryContainer.withOpacity(0.1),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      metadata.title ?? '',
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if (metadata.desc != null && metadata.desc!.isNotEmpty) ...[
-                      const SizedBox(height: 4),
+                
+                // Title & Description Bar
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  color: isDark ? colorScheme.surfaceVariant : colorScheme.primaryContainer.withOpacity(0.1),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        metadata.desc!,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant.withOpacity(0.7),
+                        metadata.title ?? '',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.onSurfaceVariant,
                         ),
-                        maxLines: 2,
+                        maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
+                      if (metadata.desc != null && metadata.desc!.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          metadata.desc!,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant.withOpacity(0.7),
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },
@@ -250,7 +256,7 @@ class _CustomLinkPreview extends StatelessWidget {
 class _ActionButton extends StatelessWidget {
   final IconData icon;
   final String label;
-  final Function(TapDownDetails)? onTap;
+  final VoidCallback? onTap;
   final Color? color;
 
   const _ActionButton({required this.icon, required this.label, required this.onTap, this.color});
@@ -258,7 +264,10 @@ class _ActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTapDown: onTap,
+      onTap: () {
+        debugPrint('PostCard: _ActionButton tapped for: $label');
+        onTap?.call();
+      },
       behavior: HitTestBehavior.opaque,
       child: Row(
         children: [

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:livepoised_mobile/core/constants/api_endpoints.dart';
 import 'package:livepoised_mobile/features/feed/data/models/post.dart';
@@ -73,16 +74,30 @@ class FeedService {
 
   Future<bool> likePost(dynamic postId) async {
     final username = await _storage.getUsername();
-    if (username == null) return false;
+    if (username == null) {
+      debugPrint('FeedService: Error liking post: Username is null');
+      return false;
+    }
 
+    final url = ApiEndpoints.likePost(postId);
+    debugPrint('FeedService: Liking post: $postId for user: $username');
+    debugPrint('FeedService: Hitting endpoint: $url');
+    
     try {
       final response = await _dio.post(
-        ApiEndpoints.likePost(postId),
+        url,
         data: {'username': username},
       );
+      debugPrint('FeedService: Like post response code: ${response.statusCode}');
+      debugPrint('FeedService: Response data: ${response.data}');
       return response.statusCode == 200;
     } catch (e) {
-      print('Error liking post: $e');
+      if (e is DioException) {
+        debugPrint('FeedService: DioError liking post: ${e.message}');
+        debugPrint('FeedService: DioError response: ${e.response?.data}');
+      } else {
+        debugPrint('FeedService: Unexpected error liking post: $e');
+      }
       return false;
     }
   }

@@ -1,9 +1,10 @@
 import 'package:dio/dio.dart';
 import '../models/post.dart';
 import '../../../../core/network/dio_client.dart';
+import '../../../../core/constants/api_endpoints.dart';
 
 class FeedRepository {
-  final Dio _dio = DioClient().springBoot;
+  final Dio _dio = DioClient().fastAPI;
 
 
   Future<List<Post>> getPosts({int page = 1, int limit = 20}) async {
@@ -40,7 +41,7 @@ class FeedRepository {
 
   Future<bool> likePost(String postId) async {
     try {
-      final response = await _dio.post('/posts/$postId/like');
+      final response = await _dio.post(ApiEndpoints.likePost(postId));
       return response.statusCode == 200;
     } catch (e) {
       return false;
