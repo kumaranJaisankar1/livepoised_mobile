@@ -27,7 +27,7 @@ class ApiEndpoints {
   static String get communities => '$baseUrlFastAPI/communities';
   static String createPost(dynamic communityId) => '$baseUrlFastAPI/communities/$communityId/posts';
   static String postDetails(dynamic postId) => '$baseUrlFastAPI/posts/$postId';
-  static String likePost(dynamic postId) => '$baseUrlFastAPI/post/$postId/like';
+  static String likePost(dynamic postId) => '$baseUrlFastAPI/posts/$postId/like';
   static String postComments(dynamic postId) => '$baseUrlFastAPI/posts/$postId/comments';
   static String likeComment(dynamic commentId) => '$baseUrlFastAPI/comments/$commentId/like';
   // Profile API (Spring Boot)

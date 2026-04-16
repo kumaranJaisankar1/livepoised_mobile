@@ -242,36 +242,37 @@ class LoginView extends GetView<AuthController> {
                         ),
                       ),
 
-                      const SizedBox(height: 12),
-
-                      SizedBox(
-                        width: double.infinity,
-                        height: 52,
-                        child: OutlinedButton.icon(
-                          style: OutlinedButton.styleFrom(
-                            side: BorderSide(color: theme.dividerColor),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                      if (GetPlatform.isIOS) ...[
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              side: BorderSide(color: theme.dividerColor),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
                             ),
-                          ),
-                          icon: FaIcon(
-                            FontAwesomeIcons.apple,
-                            color: theme.colorScheme.primary,
-                            size: 22,
-                          ),
-                          label: const Text(
-                            'Continue with Apple',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
+                            icon: FaIcon(
+                              FontAwesomeIcons.apple,
+                              color: theme.colorScheme.primary,
+                              size: 22,
                             ),
+                            label: const Text(
+                              'Continue with Apple',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            onPressed: () {
+                              FocusScope.of(context).unfocus();
+                              controller.loginWithApple();
+                            },
                           ),
-                          onPressed: () {
-                            FocusScope.of(context).unfocus();
-                            controller.loginWithApple();
-                          },
                         ),
-                      ),
+                      ],
 
                       const Spacer(flex: 2),
                       const SizedBox(height: 16),
