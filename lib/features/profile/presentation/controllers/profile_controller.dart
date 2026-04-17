@@ -195,18 +195,36 @@ class ProfileController extends GetxController {
   }
 
   Future<void> uploadAvatar(File file) async {
+    final username = _authController.userProfile.value?.username;
+    if (username == null) {
+      Get.snackbar('Error', 'User not authenticated');
+      return;
+    }
+
     try {
       Get.showOverlay(
         asyncFunction: () async {
           final result = await _profileService.uploadImage(
+            username,
             file,
             onProgress: (sent, total) {
               print("Upload Progress: ${(sent / total * 100).toStringAsFixed(0)}%");
             },
           );
-          if (result['status'] == 'success') {
-            userImage.value = result['image'] ?? "";
+
+          // Refetch the uploaded image to ensure synchronous backend update
+          try {
+            final imageData = await _profileService.getUserImage(username);
+            final newImage = imageData['image'] ?? result['image'] ?? "";
+            userImage.value = newImage;
+            _box.write(_userImageCacheKey, newImage);
             Get.snackbar('Success', 'Profile image updated');
+          } catch (e) {
+            print('Failed to refetch image: $e');
+            // Graceful fallback to the upload response
+            userImage.value = result['image'] ?? "";
+            _box.write(_userImageCacheKey, userImage.value);
+            Get.snackbar('Success', 'Profile image uploaded');
           }
         },
         loadingWidget: Center(child: CircularProgressIndicator()),

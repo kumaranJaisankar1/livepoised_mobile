@@ -67,11 +67,13 @@ class AuthService {
       );
 
       if (result != null && result.accessToken != null) {
+        final userProfile = _parseUserProfileFromIdToken(result.idToken);
         await _storage.saveTokens(
           accessToken: result.accessToken!,
           refreshToken: result.refreshToken,
           idToken: result.idToken,
-          userProfile: _parseUserProfileFromIdToken(result.idToken),
+          username: userProfile?.username,
+          userProfile: userProfile,
         );
         return true;
       }
@@ -171,6 +173,7 @@ class AuthService {
           accessToken: data['access_token'],
           refreshToken: data['refresh_token'],
           idToken: data['id_token'],
+          username: userProfile?.username,
           userProfile: userProfile,
         );
         return true;
@@ -242,6 +245,7 @@ class AuthService {
           accessToken: data['access_token'],
           refreshToken: data['refresh_token'],
           idToken: data['id_token'],
+          username: userProfile?.username,
           userProfile: userProfile,
         );
         return true;
@@ -340,6 +344,7 @@ class AuthService {
           accessToken: data['access_token'],
           refreshToken: data['refresh_token'],
           idToken: data['id_token'],
+          username: userProfile?.username,
           userProfile: userProfile,
         );
         return true;
@@ -394,6 +399,7 @@ class AuthService {
           accessToken: data['access_token'],
           refreshToken: data['refresh_token'],
           idToken: data['id_token'],
+          username: userProfile?.username,
           userProfile: userProfile,
         );
         return true;

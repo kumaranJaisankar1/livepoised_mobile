@@ -174,6 +174,9 @@ class FeedService {
 
   Future<bool> createPost(dynamic communityId, CreatePostRequest request) async {
     try {
+      final username = await _storage.getUsername();
+      if (username == null) return false;
+
       final response = await _dio.post(
         ApiEndpoints.createPost(communityId),
         data: request.toJson(),
@@ -187,6 +190,9 @@ class FeedService {
 
   Future<bool> updatePost(dynamic postId, CreatePostRequest request) async {
     try {
+      final username = await _storage.getUsername();
+      if (username == null) return false;
+
       final response = await _dio.put(
         ApiEndpoints.postDetails(postId),
         data: request.toJson(),

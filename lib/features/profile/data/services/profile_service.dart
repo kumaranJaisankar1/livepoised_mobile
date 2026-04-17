@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:livepoised_mobile/core/network/dio_client.dart';
 import 'package:livepoised_mobile/core/constants/api_endpoints.dart';
@@ -43,11 +44,13 @@ class ProfileService {
     }
   }
 
-  Future<Map<String, dynamic>> uploadImage(File file, {Function(int, int)? onProgress}) async {
+  Future<Map<String, dynamic>> uploadImage(String username, File file, {Function(int, int)? onProgress}) async {
     try {
       String fileName = file.path.split('/').last;
       FormData formData = FormData.fromMap({
-        "file": await MultipartFile.fromFile(file.path, filename: fileName),
+        "username": username,
+        "imageName": fileName,
+        "image": await MultipartFile.fromFile(file.path, filename: fileName),
       });
       
       final response = await _dio.post(
@@ -57,10 +60,20 @@ class ProfileService {
           headers: {
             "Content-Type": "multipart/form-data",
           },
+          responseType: ResponseType.plain,
         ),
         onSendProgress: onProgress,
       );
-      return response.data;
+
+      final responseStr = response.data.toString();
+      try {
+        return json.decode(responseStr) as Map<String, dynamic>;
+      } catch (e) {
+        return {
+          "status": "success",
+          "message": responseStr,
+        };
+      }
     } catch (e) {
       print('Error uploading image: $e');
       rethrow;
