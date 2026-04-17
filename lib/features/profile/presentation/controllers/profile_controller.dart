@@ -183,6 +183,8 @@ class ProfileController extends GetxController {
     try {
       final XFile? image = await _picker.pickImage(
         source: ImageSource.gallery,
+        maxWidth: 1080,
+        maxHeight: 1080,
         imageQuality: 70, // Compresses image to 70% quality for faster upload
       );
       

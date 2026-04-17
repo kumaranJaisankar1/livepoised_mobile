@@ -209,11 +209,16 @@ class AuthService {
         developer.log('Failed to retrieve Apple Identity Token.');
         return false;
       }
-
       developer.log(
         'Apple Identity Token retrieved. Exchanging with Keycloak...',
       );
-
+      final userProfileData = jsonEncode({
+        "name": {
+          "firstName": credential.givenName,
+          "lastName": credential.familyName,
+        },
+        "email": credential.email,
+      });
       // Token Exchange with Keycloak using the Apple Identity Token
       final response = await _dio.post(
         ApiEndpoints.tokenEndpoint,
@@ -226,13 +231,7 @@ class AuthService {
           'subject_issuer': 'apple',
           'client_secret': dotenv.get('CLIENT_SECRET'),
           'scope': 'openid name email',
-          'user_profile': {
-            "name": {
-              "firstName": credential.givenName,
-              "lastName": credential.familyName,
-            },
-            "email": credential.email,
-          },
+          'user_profile': userProfileData,
         },
         options: Options(contentType: Headers.formUrlEncodedContentType),
       );
