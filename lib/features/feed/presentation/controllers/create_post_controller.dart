@@ -17,6 +17,7 @@ class CreatePostController extends GetxController {
 
   final titleController = TextEditingController();
   final contentController = TextEditingController();
+  final linkController = TextEditingController();
   final tags = <String>[].obs;
   final visibility = "public".obs;
 
@@ -32,7 +33,18 @@ class CreatePostController extends GetxController {
       isEditMode.value = true;
       editingPostId = post.id.toString();
       titleController.text = post.title;
-      contentController.text = post.content;
+      
+      // Extract link from content if present
+      final urlRegExp = RegExp(r"((https?:|www\.)[^\s]+)", caseSensitive: false);
+      final match = urlRegExp.firstMatch(post.content);
+      if (match != null) {
+        final link = match.group(0)!;
+        linkController.text = link;
+        contentController.text = post.content.replaceFirst(link, '').trim();
+      } else {
+        contentController.text = post.content;
+      }
+      
       tags.assignAll(post.tags);
       visibility.value = post.visibility ?? "public";
     }
@@ -43,6 +55,7 @@ class CreatePostController extends GetxController {
   void onClose() {
     titleController.dispose();
     contentController.dispose();
+    linkController.dispose();
     super.onClose();
   }
 
@@ -93,9 +106,14 @@ class CreatePostController extends GetxController {
         return;
       }
 
+      String finalContent = contentController.text;
+      if (linkController.text.isNotEmpty) {
+        finalContent += "\n\n${linkController.text}";
+      }
+
       final request = CreatePostRequest(
         title: titleController.text,
-        content: contentController.text,
+        content: finalContent,
         tags: tags.toList(),
         visibility: visibility.value,
         username: username,

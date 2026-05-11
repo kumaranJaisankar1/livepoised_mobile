@@ -26,6 +26,22 @@ class ProfileResponse {
     );
   }
 
+  factory ProfileResponse.fromFastJson(Map<String, dynamic> json) {
+    return ProfileResponse(
+      userProfile: UserProfileFull.fromFastJson(json),
+      personalDetails: PersonalDetails.fromFastJson(json),
+      address: Address(
+        city: '',
+        state: '',
+        country: json['country'] ?? '',
+        postalCode: '',
+      ),
+      forumPostsCount: 0,
+      helpfulResponsesCount: 0,
+      loginDetails: null,
+    );
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'userProfile': userProfile.toJson(),
@@ -57,6 +73,7 @@ class UserProfileFull {
   final String? aboutMe;
   final int completionPercentage;
   final bool onboarded;
+  final String? profileImageUrl;
   final List<Caregiver> caregivers;
 
   UserProfileFull({
@@ -78,6 +95,7 @@ class UserProfileFull {
     this.aboutMe,
     required this.completionPercentage,
     required this.onboarded,
+    this.profileImageUrl,
     required this.caregivers,
   });
 
@@ -101,10 +119,32 @@ class UserProfileFull {
       aboutMe: json['aboutMe'],
       completionPercentage: json['completionPercentage'] ?? 0,
       onboarded: json['onboarded'] ?? false,
+      profileImageUrl: json['profileImageUrl'],
       caregivers: (json['caregivers'] as List?)
               ?.map((e) => Caregiver.fromJson(e))
               .toList() ??
           [],
+    );
+  }
+
+  factory UserProfileFull.fromFastJson(Map<String, dynamic> json) {
+    return UserProfileFull(
+      profileId: json['profile_id'] ?? 0,
+      userId: json['user_id'] ?? 0,
+      userType: 'Mentee',
+      username: json['username'] ?? '',
+      email: json['email'] ?? '',
+      mobileNumber: json['mobile_number'],
+      firstName: json['first_name'] ?? '',
+      middleName: json['middle_name'],
+      lastName: json['last_name'] ?? '',
+      gender: json['gender'] ?? '',
+      dateOfBirth: '',
+      aboutMe: json['about_me'],
+      completionPercentage: 0,
+      onboarded: json['onboarded'] ?? false,
+      profileImageUrl: json['profile_image_url'],
+      caregivers: [],
     );
   }
 
@@ -225,6 +265,21 @@ class PersonalDetails {
       fitnessLevel: json['fitnessLevel'],
       availabilityHoursPerWeek: json['availabilityHoursPerWeek'],
       offerSupport: json['offerSupport'] ?? false,
+    );
+  }
+
+  factory PersonalDetails.fromFastJson(Map<String, dynamic> json) {
+    return PersonalDetails(
+      injuryType: json['injury_type'] ?? '',
+      injuryDetails: json['injury_details'],
+      yearsSinceInjury: json['years_since_injury'] ?? 0,
+      recoveryMilestones: [],
+      achievements: [],
+      personalStory: json['personalStory'], // Key might differ, use existing for now
+      conditionDetails: json['condition_details'],
+      stageOfRecovery: json['stage_of_recovery'] ?? '',
+      mentorshipGoals: json['mentorship_goals'],
+      offerSupport: false,
     );
   }
 

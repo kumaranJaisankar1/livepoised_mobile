@@ -143,4 +143,38 @@ class PostDetailsController extends GetxController {
       Get.snackbar('Error', 'Failed to like comment');
     }
   }
+
+  Future<void> updateComment(dynamic commentId, String text) async {
+    isLoading.value = true;
+    try {
+      final success = await _feedService.updateComment(commentId, text);
+      if (success) {
+        await fetchPostDetails(post.value!.id);
+        Get.snackbar('Success', 'Comment updated');
+      } else {
+        Get.snackbar('Error', 'Failed to update comment');
+      }
+    } catch (e) {
+      Get.snackbar('Error', 'An unexpected error occurred');
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Future<void> deleteComment(dynamic commentId) async {
+    isLoading.value = true;
+    try {
+      final success = await _feedService.deleteComment(commentId);
+      if (success) {
+        await fetchPostDetails(post.value!.id);
+        Get.snackbar('Success', 'Comment deleted');
+      } else {
+        Get.snackbar('Error', 'Failed to delete comment');
+      }
+    } catch (e) {
+      Get.snackbar('Error', 'An unexpected error occurred');
+    } finally {
+      isLoading.value = false;
+    }
+  }
 }

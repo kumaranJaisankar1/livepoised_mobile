@@ -34,7 +34,7 @@ class CreatePostView extends GetView<CreatePostController> {
         }
 
         return SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -43,13 +43,15 @@ class CreatePostView extends GetView<CreatePostController> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: theme.dividerColor),
+                  color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.transparent),
                 ),
                 child: DropdownButtonHideUnderline(
                   child: DropdownButton<String>(
                     value: controller.selectedCommunity.value?.id?.toString(),
                     isExpanded: true,
+                    style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
                     hint: const Text('Choose a community'),
                     onChanged: (val) {
                       final comm = controller.communities.firstWhere((c) => c.id.toString() == val);
@@ -70,9 +72,24 @@ class CreatePostView extends GetView<CreatePostController> {
               _buildLabel('Title', theme),
               TextField(
                 controller: controller.titleController,
+                style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
                 decoration: InputDecoration(
                   hintText: 'Give your post a clear title',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  hintStyle: TextStyle(color: theme.hintColor.withOpacity(0.4)),
+                  filled: true,
+                  fillColor: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.5),
+                  ),
                 ),
               ),
               const SizedBox(height: 12),
@@ -82,10 +99,77 @@ class CreatePostView extends GetView<CreatePostController> {
               TextField(
                 controller: controller.contentController,
                 maxLines: 8,
+                style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
                 decoration: InputDecoration(
                   hintText: 'Share your thoughts, story, or question...',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  hintStyle: TextStyle(color: theme.hintColor.withOpacity(0.4)),
+                  filled: true,
+                  fillColor: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.5),
+                  ),
                 ),
+              ),
+              const SizedBox(height: 20),
+
+              // Link
+              _buildLabel(
+                'Social Media / Video Link', 
+                theme, 
+                showInfo: true, 
+                infoText: 'Add a link to a YouTube video, social media post, or other relevant resources. This link will be displayed as a preview in the feed.'
+              ),
+              TextField(
+                controller: controller.linkController,
+                style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
+                decoration: InputDecoration(
+                  hintText: 'https://youtube.com/...',
+                  hintStyle: TextStyle(color: theme.hintColor.withOpacity(0.4)),
+                  filled: true,
+                  fillColor: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.5),
+                  ),
+                  prefixIcon: const Icon(Icons.link),
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Tags
+              _buildLabel('Tags', theme),
+              _TagInput(
+                onSubmitted: (tag) => controller.addTag(tag),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                children: controller.tags.map((tag) {
+                  return Chip(
+                    label: Text(tag),
+                    onDeleted: () => controller.removeTag(tag),
+                    backgroundColor: theme.colorScheme.primaryContainer.withOpacity(0.3),
+                    side: BorderSide.none,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  );
+                }).toList(),
               ),
               const SizedBox(height: 20),
 
@@ -111,25 +195,6 @@ class CreatePostView extends GetView<CreatePostController> {
                 ],
               ),
               const SizedBox(height: 20),
-
-              // Tags
-              _buildLabel('Tags', theme),
-              _TagInput(
-                onSubmitted: (tag) => controller.addTag(tag),
-              ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                children: controller.tags.map((tag) {
-                  return Chip(
-                    label: Text(tag),
-                    onDeleted: () => controller.removeTag(tag),
-                    backgroundColor: theme.colorScheme.primaryContainer.withOpacity(0.3),
-                    side: BorderSide.none,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                  );
-                }).toList(),
-              ),
             ],
           ),
         );
@@ -137,15 +202,37 @@ class CreatePostView extends GetView<CreatePostController> {
     );
   }
 
-  Widget _buildLabel(String text, ThemeData theme) {
+  Widget _buildLabel(String text, ThemeData theme, {bool showInfo = false, String? infoText}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8, left: 4),
-      child: Text(
-        text,
-        style: theme.textTheme.titleSmall?.copyWith(
-          fontWeight: FontWeight.bold,
-          color: theme.colorScheme.primary,
-        ),
+      child: Row(
+        children: [
+          Text(
+            text,
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: theme.colorScheme.primary,
+            ),
+          ),
+          if (showInfo) ...[
+            const SizedBox(width: 8),
+            InkWell(
+              onTap: () {
+                Get.dialog(
+                  AlertDialog(
+                    title: const Text('About this field'),
+                    content: Text(infoText ?? ''),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    actions: [
+                      TextButton(onPressed: () => Get.back(), child: const Text('Close'))
+                    ],
+                  ),
+                );
+              },
+              child: Icon(Icons.info_outline, size: 16, color: theme.colorScheme.primary),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -216,10 +303,15 @@ class _TagInputState extends State<_TagInput> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return TextField(
       controller: controller,
+      style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
       decoration: InputDecoration(
         hintText: 'Add a tag and press enter',
+        hintStyle: TextStyle(color: theme.hintColor.withOpacity(0.4)),
+        filled: true,
+        fillColor: theme.colorScheme.surfaceVariant.withOpacity(0.3),
         suffixIcon: IconButton(
           icon: const Icon(Icons.add),
           onPressed: () {
@@ -227,8 +319,19 @@ class _TagInputState extends State<_TagInput> {
             controller.clear();
           },
         ),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: theme.colorScheme.primary, width: 1.5),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       ),
       onSubmitted: (value) {
         widget.onSubmitted(value);

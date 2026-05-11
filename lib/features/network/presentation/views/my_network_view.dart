@@ -213,7 +213,7 @@ class MyNetworkView extends GetView<NetworkController> {
                       color: Colors.transparent,
                       child: InkWell(
                         onTap: () {
-                          // Optional: Navigate to user profile
+                          Get.toNamed('/profile/${conn.username}');
                         },
                         child: Padding(
                           padding: const EdgeInsets.all(12),

@@ -185,62 +185,69 @@ class NetworkSearchDelegate extends SearchDelegate<String> {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: CircleAvatar(
-                backgroundColor: theme.colorScheme.primaryContainer,
-                foregroundImage: imageProvider,
-                child: Text(match.fullName[0].toUpperCase()),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () {
+          debugPrint('Navigating to profile from search: ${match.username}');
+          Get.toNamed('/profile/${match.username}');
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: CircleAvatar(
+                  backgroundColor: theme.colorScheme.primaryContainer,
+                  foregroundImage: imageProvider,
+                  child: Text(match.fullName[0].toUpperCase()),
+                ),
+                title: Row(
+                  children: [
+                    Expanded(child: Text(match.fullName, style: const TextStyle(fontWeight: FontWeight.bold))),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: confidenceColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: confidenceColor),
+                      ),
+                      child: Text(
+                        '${match.matchConfidence}% Match',
+                        style: TextStyle(color: confidenceColor, fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                ),
+                subtitle: Text('@${match.username}'),
+                trailing: _buildActionButton(match),
               ),
-              title: Row(
-                children: [
-                  Expanded(child: Text(match.fullName, style: const TextStyle(fontWeight: FontWeight.bold))),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: confidenceColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: confidenceColor),
-                    ),
-                    child: Text(
-                      '${match.matchConfidence}% Match',
-                      style: TextStyle(color: confidenceColor, fontSize: 10, fontWeight: FontWeight.bold),
-                    ),
+              if (match.aboutMe != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8.0),
+                  child: Text(
+                    match.aboutMe!,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall,
                   ),
-                ],
-              ),
-              subtitle: Text('@${match.username}'),
-              trailing: _buildActionButton(match),
-            ),
-            if (match.aboutMe != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 8.0),
-                child: Text(
-                  match.aboutMe!,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodySmall,
                 ),
-              ),
-            if (match.liveExperienceTags != null && match.liveExperienceTags!.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 8.0),
-                child: Wrap(
-                  spacing: 4,
-                  runSpacing: 0,
-                  children: match.liveExperienceTags!.take(3).map((tag) => Chip(
-                    label: Text(tag, style: const TextStyle(fontSize: 10)),
-                    padding: EdgeInsets.zero,
-                    visualDensity: VisualDensity.compact,
-                  )).toList(),
+              if (match.liveExperienceTags != null && match.liveExperienceTags!.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8.0),
+                  child: Wrap(
+                    spacing: 4,
+                    runSpacing: 0,
+                    children: match.liveExperienceTags!.take(3).map((tag) => Chip(
+                      label: Text(tag, style: const TextStyle(fontSize: 10)),
+                      padding: EdgeInsets.zero,
+                      visualDensity: VisualDensity.compact,
+                    )).toList(),
+                  ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );

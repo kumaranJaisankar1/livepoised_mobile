@@ -203,5 +203,80 @@ class FeedService {
       return false;
     }
   }
+
+  Future<bool> reportPost(dynamic postId, {required String reason, String? description}) async {
+    final username = await _storage.getUsername();
+    if (username == null) return false;
+
+    try {
+      final response = await _dio.post(
+        ApiEndpoints.reportPost(postId),
+        data: {
+          'reason': reason,
+          'description': description ?? '',
+          'username': username,
+        },
+      );
+      return response.statusCode == 200 || response.statusCode == 201;
+    } catch (e) {
+      print('Error reporting post: $e');
+      return false;
+    }
+  }
+
+  Future<bool> reportComment(dynamic commentId, {required String reason, String? description}) async {
+    final username = await _storage.getUsername();
+    if (username == null) return false;
+
+    try {
+      final response = await _dio.post(
+        ApiEndpoints.reportComment(commentId),
+        data: {
+          'reason': reason,
+          'description': description ?? '',
+          'username': username,
+        },
+      );
+      return response.statusCode == 200 || response.statusCode == 201;
+    } catch (e) {
+      print('Error reporting comment: $e');
+      return false;
+    }
+  }
+
+  Future<bool> updateComment(dynamic commentId, String text) async {
+    final username = await _storage.getUsername();
+    if (username == null) return false;
+
+    try {
+      final response = await _dio.put(
+        ApiEndpoints.commentDetails(commentId),
+        data: {
+          'username': username,
+          'text': text,
+        },
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Error updating comment: $e');
+      return false;
+    }
+  }
+
+  Future<bool> deleteComment(dynamic commentId) async {
+    final username = await _storage.getUsername();
+    if (username == null) return false;
+
+    try {
+      final response = await _dio.delete(
+        ApiEndpoints.commentDetails(commentId),
+        data: {'username': username},
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Error deleting comment: $e');
+      return false;
+    }
+  }
 }
 

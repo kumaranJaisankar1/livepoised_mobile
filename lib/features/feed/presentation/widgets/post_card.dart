@@ -6,6 +6,10 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/utils/image_utils.dart';
 import '../../data/models/post.dart';
 import 'package:timeago/timeago.dart' as timeago;
+import './report_bottom_sheet.dart';
+import '../../../auth/auth_controller.dart';
+import '../../services/feed_service.dart';
+import '../controllers/feed_controller.dart';
 
 class PostCard extends StatelessWidget {
   final Post post;
@@ -32,32 +36,45 @@ class PostCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final url = _extractUrl(post.content);
 
-    return InkWell(
-      onTap: () => Get.toNamed('/post-details', arguments: post),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
             Row(
               children: [
-                CircleAvatar(
-                  backgroundImage: ImageUtils.getImageProvider(post.authorImageUrl),
-                  child: post.authorImageUrl == null 
-                    ? Text(post.authorName[0]) 
-                    : null,
+                InkWell(
+                  onTap: () {
+                    final username = post.authorUserId ?? post.authorName;
+                    debugPrint('Navigating to profile: $username');
+                    Get.toNamed('/profile/$username');
+                  },
+                  borderRadius: BorderRadius.circular(20),
+                  child: CircleAvatar(
+                    backgroundImage: ImageUtils.getImageProvider(post.authorImageUrl),
+                    child: post.authorImageUrl == null 
+                      ? Text(post.authorName[0]) 
+                      : null,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        post.authorName, 
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)
-                      ),
-                      Text(timeago.format(post.createdAt), style: Theme.of(context).textTheme.labelSmall),
-                    ],
+                  child: InkWell(
+                    onTap: () {
+                      final username = post.authorUserId ?? post.authorName;
+                      debugPrint('Navigating to profile: $username');
+                      Get.toNamed('/profile/$username');
+                    },
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          post.authorName, 
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)
+                        ),
+                        Text(timeago.format(post.createdAt), style: Theme.of(context).textTheme.labelSmall),
+                      ],
+                    ),
                   ),
                 ),
                 Container(
@@ -75,27 +92,36 @@ class PostCard extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            Text(
-              post.content, 
-              style: Theme.of(context).textTheme.bodyLarge,
-              maxLines: 4,
-              overflow: TextOverflow.ellipsis,
-            ),
-            if (url != null) ...[
-              const SizedBox(height: 12),
-              _CustomLinkPreview(url: url),
-            ],
-            if (post.tags.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                children: post.tags.map((tag) => Text(
-                  '#$tag', 
-                  style: TextStyle(color: Theme.of(context).colorScheme.primary)
-                )).toList(),
+            GestureDetector(
+              onTap: () => Get.toNamed('/post-details', arguments: post),
+              behavior: HitTestBehavior.opaque,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 12),
+                  Text(
+                    post.content, 
+                    style: Theme.of(context).textTheme.bodyLarge,
+                    maxLines: 4,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (url != null) ...[
+                    const SizedBox(height: 12),
+                    _CustomLinkPreview(url: url),
+                  ],
+                  if (post.tags.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      children: post.tags.map((tag) => Text(
+                        '#$tag', 
+                        style: TextStyle(color: Theme.of(context).colorScheme.primary)
+                      )).toList(),
+                    ),
+                  ],
+                ],
               ),
-            ],
+            ),
             const SizedBox(height: 16),
             Row(
               children: [
@@ -112,14 +138,105 @@ class PostCard extends StatelessWidget {
                   onTap: onReply,
                 ),
                 const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.share_outlined, size: 20),
-                  onPressed: () {},
-                )
+                // IconButton(
+                //   icon: const Icon(Icons.share_outlined, size: 20),
+                //   onPressed: () {},
+                // ),
+                _buildMenu(context),
               ],
             )
           ],
         ),
+    );
+  }
+
+  Widget _buildMenu(BuildContext context) {
+    return Obx(() {
+      final authController = Get.find<AuthController>();
+      final currentUsername = authController.userProfile.value?.username;
+      
+      final bool isOwner = currentUsername != null && 
+          (currentUsername.toLowerCase() == post.authorUserId?.toLowerCase() || 
+           currentUsername.toLowerCase() == post.authorName.toLowerCase());
+
+      return PopupMenuButton<String>(
+        icon: const Icon(Icons.more_vert, size: 20),
+        onSelected: (value) async {
+        if (value == 'report') {
+          Get.bottomSheet(
+            ReportBottomSheet(contentId: post.id, isPost: true),
+            isScrollControlled: true,
+          );
+        } else if (value == 'edit') {
+          Get.toNamed('/create-post', arguments: {'post': post});
+        } else if (value == 'delete') {
+          _showDeleteConfirmation();
+        }
+      },
+      itemBuilder: (context) => [
+        if (!isOwner)
+          const PopupMenuItem(
+            value: 'report',
+            child: Row(
+              children: [
+                Icon(Icons.flag_outlined, size: 20, color: Colors.red),
+                SizedBox(width: 8),
+                Text('Report Post', style: TextStyle(color: Colors.red)),
+              ],
+            ),
+          ),
+        if (isOwner) ...[
+          const PopupMenuItem(
+            value: 'edit',
+            child: Row(
+              children: [
+                Icon(Icons.edit_outlined, size: 20),
+                SizedBox(width: 8),
+                Text('Edit Post'),
+              ],
+            ),
+          ),
+          const PopupMenuItem(
+            value: 'delete',
+            child: Row(
+              children: [
+                Icon(Icons.delete_outline, size: 20, color: Colors.red),
+                SizedBox(width: 8),
+                Text('Delete Post', style: TextStyle(color: Colors.red)),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+    });
+  }
+
+  void _showDeleteConfirmation() {
+    Get.dialog(
+      AlertDialog(
+        title: const Text('Delete Post'),
+        content: const Text('Are you sure you want to delete this post? This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Get.back(); // Close dialog
+              final success = await FeedService().deletePost(post.id);
+              if (success) {
+                Get.snackbar('Success', 'Post deleted successfully');
+                Get.find<FeedController>().fetchPosts(refresh: true);
+              } else {
+                Get.snackbar('Error', 'Failed to delete post');
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            child: const Text('Delete'),
+          ),
+        ],
       ),
     );
   }

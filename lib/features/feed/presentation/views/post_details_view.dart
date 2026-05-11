@@ -4,6 +4,8 @@ import 'package:timeago/timeago.dart' as timeago;
 import '../../data/models/comment.dart';
 import '../widgets/post_card.dart';
 import '../controllers/post_details_controller.dart';
+import '../widgets/report_bottom_sheet.dart';
+import '../../../auth/auth_controller.dart';
 
 class PostDetailsView extends GetView<PostDetailsController> {
   const PostDetailsView({super.key});
@@ -219,6 +221,76 @@ class _CommentItemState extends State<_CommentItem> {
                   ),
                 ),
               ),
+              Obx(() {
+                final authController = Get.find<AuthController>();
+                final currentUsername = authController.userProfile.value?.username;
+                
+                // Debug log to identify why isOwner might be false
+                debugPrint('Checking comment owner: user=$currentUsername, comment_author=${widget.comment.authorName}, comment_uid=${widget.comment.authorUserId}');
+
+                final isOwner = currentUsername != null && 
+                    (currentUsername.toLowerCase() == widget.comment.authorUserId?.toLowerCase() || 
+                     currentUsername.toLowerCase() == widget.comment.authorName.toLowerCase() ||
+                     currentUsername.toLowerCase() == widget.comment.authorId?.toLowerCase());
+
+                return PopupMenuButton<String>(
+                  icon: Icon(Icons.more_horiz, size: 16, color: theme.hintColor),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  onSelected: (value) {
+                    if (value == 'report') {
+                      Get.bottomSheet(
+                        ReportBottomSheet(contentId: widget.comment.id, isPost: false),
+                        isScrollControlled: true,
+                      );
+                    } else if (value == 'edit') {
+                      _showEditCommentDialog(context, controller);
+                    } else if (value == 'delete') {
+                      _showDeleteCommentConfirmation(context, controller);
+                    }
+                  },
+                  itemBuilder: (context) {
+                    return [
+                      if (!isOwner)
+                        const PopupMenuItem(
+                          value: 'report',
+                          height: 32,
+                          child: Row(
+                            children: [
+                              Icon(Icons.flag_outlined, size: 16, color: Colors.red),
+                              SizedBox(width: 8),
+                              Text('Report', style: TextStyle(fontSize: 13, color: Colors.red)),
+                            ],
+                          ),
+                        ),
+                      if (isOwner) ...[
+                        const PopupMenuItem(
+                          value: 'edit',
+                          height: 32,
+                          child: Row(
+                            children: [
+                              Icon(Icons.edit_outlined, size: 16),
+                              SizedBox(width: 8),
+                              Text('Edit', style: TextStyle(fontSize: 13)),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'delete',
+                          height: 32,
+                          child: Row(
+                            children: [
+                              Icon(Icons.delete_outline, size: 16, color: Colors.red),
+                              SizedBox(width: 8),
+                              Text('Delete', style: TextStyle(fontSize: 13, color: Colors.red)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ];
+                  },
+                );
+              }),
             ],
           ),
         ),
@@ -227,7 +299,58 @@ class _CommentItemState extends State<_CommentItem> {
       ],
     );
   }
+
+  void _showEditCommentDialog(BuildContext context, PostDetailsController controller) {
+    final textController = TextEditingController(text: widget.comment.text);
+    Get.dialog(
+      AlertDialog(
+        title: const Text('Edit Comment'),
+        content: TextField(
+          controller: textController,
+          maxLines: 3,
+          decoration: InputDecoration(
+            hintText: 'Enter your comment...',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () {
+              final newText = textController.text.trim();
+              if (newText.isNotEmpty && newText != widget.comment.text) {
+                controller.updateComment(widget.comment.id, newText);
+              }
+              Get.back();
+            },
+            child: const Text('Update'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteCommentConfirmation(BuildContext context, PostDetailsController controller) {
+    Get.dialog(
+      AlertDialog(
+        title: const Text('Delete Comment'),
+        content: const Text('Are you sure you want to delete this comment?'),
+        actions: [
+          TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () {
+              controller.deleteComment(widget.comment.id);
+              Get.back();
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
 }
+
 
 class _ReplyInput extends StatefulWidget {
   final Function(String, {String? parentId}) onSend;

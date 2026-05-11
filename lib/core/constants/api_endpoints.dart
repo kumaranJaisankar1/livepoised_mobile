@@ -30,8 +30,12 @@ class ApiEndpoints {
   static String likePost(dynamic postId) => '$baseUrlFastAPI/posts/$postId/like';
   static String postComments(dynamic postId) => '$baseUrlFastAPI/posts/$postId/comments';
   static String likeComment(dynamic commentId) => '$baseUrlFastAPI/comments/$commentId/like';
+  static String reportPost(dynamic postId) => '$baseUrlFastAPI/posts/$postId/report';
+  static String reportComment(dynamic commentId) => '$baseUrlFastAPI/comments/$commentId/report';
+  static String commentDetails(dynamic commentId) => '$baseUrlFastAPI/comments/$commentId';
   // Profile API (Spring Boot)
   static String getProfile(String username) => '$baseUrlSpringBoot/profile/$username';
+  static String getUserProfileFastAPI(String username) => '$baseUrlFastAPI/api/user-profile?username=$username';
   static String updateProfile(String username) => '$baseUrlSpringBoot/profile/updateProfile/$username';
   static String get getUserImage => '$baseUrlSpringBoot/images/getUserImage';
   static String get uploadImage => '$baseUrlSpringBoot/images/uploadImage';

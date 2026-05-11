@@ -18,6 +18,15 @@ class ProfileService {
     }
   }
 
+  Future<ProfileResponse> getProfileDetailsFastAPI(String username) async {
+    try {
+      final response = await DioClient().fastAPI.get(ApiEndpoints.getUserProfileFastAPI(username));
+      return ProfileResponse.fromFastJson(response.data);
+    } catch (e) {
+      print('Error fetching FastAPI profile: $e');
+      rethrow;
+    }
+  }
   Future<Map<String, dynamic>> getUserImage(String username) async {
     try {
       final response = await _dio.get(
