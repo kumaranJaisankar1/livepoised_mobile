@@ -4,6 +4,7 @@ import 'package:any_link_preview/any_link_preview.dart';
 import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/utils/image_utils.dart';
+import '../../../../core/network/dio_client.dart';
 import '../../data/models/post.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import './report_bottom_sheet.dart';
@@ -244,128 +245,223 @@ class PostCard extends StatelessWidget {
 
 
 
-class _CustomLinkPreview extends StatelessWidget {
+class _PreviewData {
+  final String? title;
+  final String? desc;
+  final String? imageUrl;
+  final String? siteName;
+
+  const _PreviewData({this.title, this.desc, this.imageUrl, this.siteName});
+}
+
+class _CustomLinkPreview extends StatefulWidget {
   final String url;
 
   const _CustomLinkPreview({required this.url});
 
+  @override
+  State<_CustomLinkPreview> createState() => _CustomLinkPreviewState();
+}
+
+class _CustomLinkPreviewState extends State<_CustomLinkPreview> {
+  // null value means "fetched but got nothing" — still cached to avoid retries
+  static final Map<String, _PreviewData?> _cache = {};
+
+  _PreviewData? _data;
+  bool _loading = true;
+
+  static bool _isAmazonLink(String url) {
+    final lower = url.toLowerCase();
+    return lower.contains('amazon.com') ||
+        lower.contains('amazon.co.') ||
+        lower.contains('amzn.to') ||
+        lower.contains('amzn.com') ||
+        lower.contains('a.co/');
+  }
+
   bool _isVideoLink(String url) {
-    return url.contains('youtube.com') || 
-           url.contains('youtu.be') || 
-           url.contains('vimeo.com') ||
-           url.contains('shorts');
+    return url.contains('youtube.com') ||
+        url.contains('youtu.be') ||
+        url.contains('vimeo.com') ||
+        url.contains('shorts');
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    if (_cache.containsKey(widget.url)) {
+      _data = _cache[widget.url];
+      _loading = false;
+    } else {
+      _fetch();
+    }
+  }
+
+  Future<void> _fetch() async {
+    _PreviewData? result;
+
+    if (_isAmazonLink(widget.url)) {
+      result = await _fetchFromFastAPI();
+    } else {
+      // 1. Try any_link_preview first for non-Amazon links
+      try {
+        final meta = await AnyLinkPreview.getMetadata(link: widget.url);
+        final hasContent = meta != null &&
+            ((meta.title != null && meta.title!.isNotEmpty) ||
+                (meta.image != null && meta.image!.isNotEmpty));
+        if (hasContent) {
+          result = _PreviewData(
+            title: meta!.title,
+            desc: meta.desc,
+            imageUrl: meta.image,
+          );
+        }
+      } catch (_) {}
+
+      // 2. Fallback to FastAPI if any_link_preview returns empty or fails
+      result ??= await _fetchFromFastAPI();
+    }
+
+    _cache[widget.url] = result;
+    if (mounted) setState(() {
+      _data = result;
+      _loading = false;
+    });
+  }
+
+  Future<_PreviewData?> _fetchFromFastAPI() async {
+    try {
+      final response = await DioClient().fastAPI.get(
+        '/api/link-preview',
+        queryParameters: {'url': widget.url},
+      );
+      final data = response.data;
+      if (data != null) {
+        return _PreviewData(
+          title: data['title'] as String?,
+          desc: data['description'] as String?,
+          imageUrl: data['image'] as String?,
+          siteName: data['site_name'] as String?,
+        );
+      }
+    } catch (_) {}
+    return null;
   }
 
   @override
   Widget build(BuildContext context) {
-    final isVideo = _isVideoLink(url);
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
 
-    return AnyLinkPreview.builder(
-      link: url,
-      placeholderWidget: Container(
+    if (_loading) {
+      return Container(
         height: 200,
         decoration: BoxDecoration(
           color: colorScheme.surfaceVariant.withOpacity(0.5),
           borderRadius: BorderRadius.circular(16),
         ),
         child: Center(child: CircularProgressIndicator(color: colorScheme.primary)),
-      ),
-      errorWidget: const SizedBox.shrink(),
-      itemBuilder: (context, metadata, imageProvider, _) {
-        return InkWell(
-          onTap: () async {
-            final uri = Uri.tryParse(url);
-            if (uri != null && await canLaunchUrl(uri)) {
-              await launchUrl(uri, mode: LaunchMode.externalApplication);
-            }
-          },
-          borderRadius: BorderRadius.circular(16),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Image Section
-                AspectRatio(
-                  aspectRatio: 16 / 9,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      // Blurred background
-                      if (imageProvider != null) ...[
-                        Image(image: imageProvider, fit: BoxFit.cover),
-                        BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                          child: Container(
-                            color: (isDark ? Colors.black : Colors.white).withOpacity(0.2),
-                          ),
-                        ),
-                      ] else
-                        Container(color: colorScheme.surfaceVariant),
+      );
+    }
 
-                      // Centered contain image
-                      if (imageProvider != null)
-                        Image(image: imageProvider, fit: BoxFit.contain),
-                      
-                      // Centered Play Button for Video
-                      if (isVideo)
-                        Center(
-                          child: Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.4),
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white.withOpacity(0.5), width: 1.5),
-                            ),
-                            child: const Icon(
-                              Icons.play_arrow_rounded,
-                              color: Colors.white,
-                              size: 44,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                
-                // Title & Description Bar
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  color: isDark ? colorScheme.surfaceVariant : colorScheme.primaryContainer.withOpacity(0.1),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        metadata.title ?? '',
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      if (metadata.desc != null && metadata.desc!.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          metadata.desc!,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant.withOpacity(0.7),
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
+    if (_data == null) return const SizedBox.shrink();
+
+    final imageProvider = _data!.imageUrl != null && _data!.imageUrl!.isNotEmpty
+        ? NetworkImage(_data!.imageUrl!) as ImageProvider
+        : null;
+    final isVideo = _isVideoLink(widget.url);
+
+    return InkWell(
+      onTap: () async {
+        final uri = Uri.tryParse(widget.url);
+        if (uri != null && await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        }
       },
+      borderRadius: BorderRadius.circular(16),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Image Section
+            AspectRatio(
+              aspectRatio: 16 / 9,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  if (imageProvider != null) ...[
+                    Image(image: imageProvider, fit: BoxFit.cover),
+                    BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                      child: Container(
+                        color: (isDark ? Colors.black : Colors.white).withOpacity(0.2),
+                      ),
+                    ),
+                    Image(image: imageProvider, fit: BoxFit.contain),
+                  ] else
+                    Container(color: colorScheme.surfaceVariant),
+                  if (isVideo)
+                    Center(
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.4),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white.withOpacity(0.5), width: 1.5),
+                        ),
+                        child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 44),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+
+            // Title & Description Bar
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              color: isDark ? colorScheme.surfaceVariant : colorScheme.primaryContainer.withOpacity(0.1),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (_data!.siteName != null && _data!.siteName!.isNotEmpty)
+                    Text(
+                      _data!.siteName!.toUpperCase(),
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: colorScheme.primary,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  if (_data!.siteName != null && _data!.siteName!.isNotEmpty)
+                    const SizedBox(height: 2),
+                  Text(
+                    _data!.title ?? '',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (_data!.desc != null && _data!.desc!.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      _data!.desc!,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant.withOpacity(0.7),
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

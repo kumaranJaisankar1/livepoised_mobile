@@ -65,6 +65,9 @@ class ApiEndpoints {
   // AI Matchmaking (FastAPI)
   static String get findMentors => '$baseUrlFastAPI/api/matchmaking/find-mentors';
 
+  // Link Preview (FastAPI)
+  static String linkPreview(String url) => '$baseUrlFastAPI/api/link-preview?url=$url';
+
   // Caregiver / Support Network (Spring Boot)
   static String searchCaregivers(String query) => '$baseUrlSpringBoot/api/care-network/search?query=$query';
   static String sendCaregiverRequest(String username, String relationship) => 
