@@ -43,6 +43,15 @@ class SettingsView extends StatelessWidget {
                 onChanged: (val) => notificationController.toggleNotifications(val),
               )),
           const Divider(),
+          _buildSectionHeader(context, 'Privacy'),
+          _buildSettingTile(
+            context,
+            title: 'Blocked Users',
+            subtitle: 'Manage blocked accounts',
+            icon: Icons.block_outlined,
+            onTap: () => Get.toNamed('/blocked-users'),
+          ),
+          const Divider(),
           _buildSectionHeader(context, 'About'),
           _buildSettingTile(
             context,

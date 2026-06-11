@@ -297,6 +297,25 @@ class _CustomLinkPreviewState extends State<_CustomLinkPreview> {
     }
   }
 
+  @override
+  void didUpdateWidget(covariant _CustomLinkPreview oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.url != oldWidget.url) {
+      if (_cache.containsKey(widget.url)) {
+        setState(() {
+          _data = _cache[widget.url];
+          _loading = false;
+        });
+      } else {
+        setState(() {
+          _loading = true;
+          _data = null;
+        });
+        _fetch();
+      }
+    }
+  }
+
   Future<void> _fetch() async {
     _PreviewData? result;
 

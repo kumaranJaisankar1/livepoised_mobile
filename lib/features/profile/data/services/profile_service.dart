@@ -27,6 +27,16 @@ class ProfileService {
       rethrow;
     }
   }
+
+  Future<bool> acceptTerms(String username) async {
+    try {
+      await _dio.post(ApiEndpoints.acceptTerms(username));
+      return true;
+    } catch (e) {
+      print('Error accepting terms: $e');
+      return false;
+    }
+  }
   Future<Map<String, dynamic>> getUserImage(String username) async {
     try {
       final response = await _dio.get(
@@ -183,6 +193,38 @@ class ProfileService {
       return (response.data as List).map((e) => LinkedUserDTO.fromJson(e)).toList();
     } catch (e) {
       print('Error fetching suggested connections: $e');
+      return [];
+    }
+  }
+
+  Future<bool> blockUser(String username, String blockedUsername) async {
+    try {
+      await _dio.post(ApiEndpoints.blockUser(username, blockedUsername));
+      return true;
+    } catch (e) {
+      print('Error blocking user: $e');
+      return false;
+    }
+  }
+
+  Future<bool> unblockUser(String username, String blockedUsername) async {
+    try {
+      await _dio.delete(ApiEndpoints.unblockUser(username, blockedUsername));
+      return true;
+    } catch (e) {
+      print('Error unblocking user: $e');
+      return false;
+    }
+  }
+
+  Future<List<BlockedUser>> getBlockedUsers(String username) async {
+    try {
+      final response = await _dio.get(ApiEndpoints.getBlockedUsers(username));
+      return (response.data as List)
+          .map((e) => BlockedUser.fromJson(e))
+          .toList();
+    } catch (e) {
+      print('Error fetching blocked users: $e');
       return [];
     }
   }

@@ -75,6 +75,7 @@ class UserProfileFull {
   final bool onboarded;
   final String? profileImageUrl;
   final List<Caregiver> caregivers;
+  final bool termsAccepted;
 
   UserProfileFull({
     required this.profileId,
@@ -97,6 +98,7 @@ class UserProfileFull {
     required this.onboarded,
     this.profileImageUrl,
     required this.caregivers,
+    required this.termsAccepted,
   });
 
   factory UserProfileFull.fromJson(Map<String, dynamic> json) {
@@ -124,6 +126,7 @@ class UserProfileFull {
               ?.map((e) => Caregiver.fromJson(e))
               .toList() ??
           [],
+      termsAccepted: json['termsAccepted'] ?? false,
     );
   }
 
@@ -145,6 +148,7 @@ class UserProfileFull {
       onboarded: json['onboarded'] ?? false,
       profileImageUrl: json['profile_image_url'],
       caregivers: [],
+      termsAccepted: json['terms_accepted'] ?? false,
     );
   }
 
@@ -169,6 +173,7 @@ class UserProfileFull {
       'completionPercentage': completionPercentage,
       'onboarded': onboarded,
       'caregivers': caregivers.map((e) => e.toJson()).toList(),
+      'termsAccepted': termsAccepted,
     };
   }
 }
@@ -539,6 +544,38 @@ class PendingCaregiverRequest {
       profileImage: json['profileImage'],
       relationship: json['relationship'] ?? '',
       linkId: json['linkId'] ?? 0,
+    );
+  }
+}
+
+class BlockedUser {
+  final int profileId;
+  final int userId;
+  final String username;
+  final String firstName;
+  final String lastName;
+  final String? aboutMe;
+  final String? profileImage;
+
+  BlockedUser({
+    required this.profileId,
+    required this.userId,
+    required this.username,
+    required this.firstName,
+    required this.lastName,
+    this.aboutMe,
+    this.profileImage,
+  });
+
+  factory BlockedUser.fromJson(Map<String, dynamic> json) {
+    return BlockedUser(
+      profileId: json['profileId'] ?? 0,
+      userId: json['userId'] ?? 0,
+      username: json['username'] ?? '',
+      firstName: json['firstName'] ?? '',
+      lastName: json['lastName'] ?? '',
+      aboutMe: json['aboutMe'],
+      profileImage: json['profileImage'] ?? json['profileImageUrl'],
     );
   }
 }

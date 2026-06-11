@@ -25,6 +25,7 @@ class ProfileController extends GetxController {
   final isContributionsLoading = false.obs;
   final isSessionsLoading = false.obs;
   final isSaving = false.obs;
+  final isAcceptingTerms = false.obs;
 
   // Form Field Observables
   // Tab 1: Personal
@@ -130,6 +131,26 @@ class ProfileController extends GetxController {
       Get.snackbar('Error', 'Failed to load profile: $e');
     } finally {
       isLoading(false);
+    }
+  }
+
+  Future<bool> acceptTermsAndConditions() async {
+    final username = _authController.userProfile.value?.username;
+    if (username == null) return false;
+
+    isAcceptingTerms(true);
+    try {
+      final success = await _profileService.acceptTerms(username);
+      if (success) {
+        await refreshProfile();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      print("Error in acceptTermsAndConditions: $e");
+      return false;
+    } finally {
+      isAcceptingTerms(false);
     }
   }
 

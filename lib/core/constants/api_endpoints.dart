@@ -39,6 +39,21 @@ class ApiEndpoints {
   static String updateProfile(String username) => '$baseUrlSpringBoot/profile/updateProfile/$username';
   static String get getUserImage => '$baseUrlSpringBoot/images/getUserImage';
   static String get uploadImage => '$baseUrlSpringBoot/images/uploadImage';
+  
+  // Terms & Conditions
+  static String acceptTerms(String username) =>
+      '$baseUrlSpringBoot/api/users/by-username/$username/accept-terms';
+
+  // External link — opened in system browser via url_launcher
+  static String get termsUrl => dotenv.get('LIVEPOISED_TERMS_URL');
+
+  // Block / Unblock User
+  static String blockUser(String username, String blockedUsername) =>
+      '$baseUrlSpringBoot/api/users/by-username/$username/block/$blockedUsername';
+  static String unblockUser(String username, String blockedUsername) =>
+      '$baseUrlSpringBoot/api/users/by-username/$username/unblock/$blockedUsername';
+  static String getBlockedUsers(String username) =>
+      '$baseUrlSpringBoot/api/users/by-username/$username/blocked';
 
   // Forum contributions
   static String getUserForumContributions(String userId) => '$baseUrlSpringBoot/api/forum/user/$userId';

@@ -2,6 +2,7 @@ import 'package:get/get.dart';
 import '../../data/models/profile_models.dart';
 import '../../data/services/profile_service.dart';
 import '../../../auth/auth_controller.dart';
+import '../../../feed/presentation/controllers/feed_controller.dart';
 
 class UserProfileController extends GetxController {
   final ProfileService _profileService = ProfileService();
@@ -16,6 +17,27 @@ class UserProfileController extends GetxController {
   final profileData = Rxn<ProfileResponse>();
   final userImage = "".obs;
   final activeTab = 0.obs;
+  final isBlocking = false.obs;
+
+  Future<bool> blockUser() async {
+    if (currentUsername.isEmpty) return false;
+    isBlocking(true);
+    try {
+      final success = await _profileService.blockUser(currentUsername, username);
+      if (success) {
+        if (Get.isRegistered<FeedController>()) {
+          Get.find<FeedController>().fetchPosts(refresh: true);
+        }
+        return true;
+      }
+      return false;
+    } catch (e) {
+      print('Error blocking user in controller: $e');
+      return false;
+    } finally {
+      isBlocking(false);
+    }
+  }
 
   @override
   void onInit() {

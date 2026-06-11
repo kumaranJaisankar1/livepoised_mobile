@@ -11,6 +11,8 @@ import '../notification/presentation/controllers/notification_controller.dart';
 import '../profile/presentation/controllers/profile_controller.dart';
 import '../network/presentation/controllers/network_controller.dart';
 
+import 'presentation/terms_consent_dialog.dart';
+
 class AuthController extends GetxController {
   final AuthService _authService = AuthService();
   final SecureStorageService _storage = SecureStorageService();
@@ -293,6 +295,32 @@ class AuthController extends GetxController {
     }
     if (Get.isRegistered<NotificationController>()) {
       Get.find<NotificationController>().updateDeviceToken();
+    }
+    _checkTermsAccepted();
+  }
+
+  Future<void> _checkTermsAccepted() async {
+    // Wait briefly for ProfileController to finish its refreshProfile
+    await Future.delayed(const Duration(milliseconds: 500));
+    
+    if (!Get.isRegistered<ProfileController>()) return;
+    final profileCtrl = Get.find<ProfileController>();
+    
+    // Poll until profile is loaded (max 5s)
+    int attempts = 0;
+    while (profileCtrl.isLoading.value && attempts < 10) {
+      await Future.delayed(const Duration(milliseconds: 500));
+      attempts++;
+    }
+
+    final termsAccepted = profileCtrl.profileData.value
+        ?.userProfile.termsAccepted ?? true;
+    
+    if (!termsAccepted) {
+      Get.dialog(
+        const TermsConsentDialog(),
+        barrierDismissible: false,
+      );
     }
   }
 }

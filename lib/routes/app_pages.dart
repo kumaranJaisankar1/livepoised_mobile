@@ -19,9 +19,11 @@ import '../features/auth/presentation/views/social_auth_view.dart';
 import '../features/auth/presentation/views/splash_view.dart';
 import '../presentation/layouts/main_layout.dart';
 import '../features/profile/presentation/controllers/profile_controller.dart';
+import '../features/profile/presentation/controllers/blocked_users_controller.dart';
 import '../features/profile/presentation/views/edit_profile_view.dart';
 import '../features/profile/presentation/views/settings_view.dart';
 import '../features/profile/presentation/views/user_profile_view.dart';
+import '../features/profile/presentation/views/blocked_users_view.dart';
 import '../features/network/presentation/controllers/network_controller.dart';
 import '../features/neuro_wellness/presentation/views/neuro_wellness_lobby_view.dart';
 import '../features/neuro_wellness/presentation/controllers/neuro_wellness_controller.dart';
@@ -114,6 +116,14 @@ class AppPages {
       name: '/settings',
       page: () => const SettingsView(),
       middlewares: [AuthMiddleware()],
+    ),
+    GetPage(
+      name: '/blocked-users',
+      page: () => const BlockedUsersView(),
+      middlewares: [AuthMiddleware()],
+      binding: BindingsBuilder(() {
+        Get.lazyPut(() => BlockedUsersController());
+      }),
     ),
     GetPage(
       name: '/profile/:username',

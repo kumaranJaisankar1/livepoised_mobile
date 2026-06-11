@@ -110,7 +110,7 @@ class UserProfileView extends StatelessWidget {
         ),
       ),
       actions: [
-        if (controller.username != controller.currentUsername)
+        if (controller.username != controller.currentUsername) ...[
           IconButton(
             onPressed: () {
               // Logic to start chat or share profile
@@ -121,6 +121,15 @@ class UserProfileView extends StatelessWidget {
               foregroundColor: Colors.white,
             ),
           ),
+          IconButton(
+            onPressed: () => _showMoreOptions(context, controller, profile),
+            icon: const Icon(Icons.more_vert),
+            style: IconButton.styleFrom(
+              backgroundColor: Colors.black.withOpacity(0.2),
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
         const SizedBox(width: 16),
       ],
       flexibleSpace: FlexibleSpaceBar(
@@ -455,10 +464,131 @@ class UserProfileView extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: TextStyle(color: Theme.of(context).hintColor)),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showMoreOptions(BuildContext context, UserProfileController controller, ProfileResponse profile) {
+    final theme = Theme.of(context);
+    final user = profile.userProfile;
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      backgroundColor: theme.colorScheme.surface,
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                margin: const EdgeInsets.only(top: 12, bottom: 8),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              ListTile(
+                leading: Icon(Icons.share_outlined, color: theme.colorScheme.primary),
+                title: const Text('Share Profile'),
+                onTap: () {
+                  Get.back();
+                  Get.snackbar(
+                    'Share Profile',
+                    'Sharing link for @${user.username} copied to clipboard!',
+                    snackPosition: SnackPosition.BOTTOM,
+                    margin: const EdgeInsets.all(16),
+                  );
+                },
+              ),
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.block_outlined, color: Colors.red),
+                title: Text(
+                  'Block @${user.username}',
+                  style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w600),
+                ),
+                onTap: () {
+                  Get.back(); // close bottom sheet
+                  _showBlockConfirmationDialog(context, controller, user);
+                },
+              ),
+              const SizedBox(height: 12),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showBlockConfirmationDialog(BuildContext context, UserProfileController controller, UserProfileFull user) {
+    final theme = Theme.of(context);
+    Get.dialog(
+      AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
+            const SizedBox(width: 8),
+            Text('Block ${user.firstName}?'),
+          ],
+        ),
+        content: Text(
+          'Are you sure you want to block @${user.username}? You will no longer see their posts, messages, or be able to interact with each other.',
+          style: const TextStyle(height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: Text('Cancel', style: TextStyle(color: theme.hintColor)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () async {
+              Get.back(); // Close dialog
+              Get.showOverlay(
+                asyncFunction: () async {
+                  final success = await controller.blockUser();
+                  if (success) {
+                    Get.back(); // Pop the UserProfileView and go back to Feed
+                    Get.snackbar(
+                      'Blocked',
+                      'You have blocked @${user.username}',
+                      snackPosition: SnackPosition.BOTTOM,
+                      backgroundColor: Colors.red[900],
+                      colorText: Colors.white,
+                      margin: const EdgeInsets.all(16),
+                    );
+                  } else {
+                    Get.snackbar('Error', 'Failed to block user');
+                  }
+                },
+                loadingWidget: const Center(child: CircularProgressIndicator()),
+              );
+            },
+            child: const Text('Block'),
+          ),
         ],
       ),
     );
