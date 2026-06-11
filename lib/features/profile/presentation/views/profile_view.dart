@@ -17,9 +17,49 @@ class ProfileView extends GetView<ProfileController> {
       body: Obx(() {
         final authController = Get.find<AuthController>();
         
-        // Show nothing or a simple message if we're logging out or not logged in
-        if (!authController.isLoggedIn.value) {
+        // If checking auth is in progress, show spinner
+        if (!authController.isAuthChecked.value) {
           return const Center(child: CircularProgressIndicator());
+        }
+
+        // If auth check completed and user is not logged in, show fallback Sign In UI
+        if (!authController.isLoggedIn.value) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.account_circle_outlined,
+                    size: 80,
+                    color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    "Sign in to view your profile",
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    "You need to be signed in to see your profile details, connections, and posts.",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton.icon(
+                    onPressed: () => Get.offAllNamed('/login'),
+                    icon: const Icon(Icons.login),
+                    label: const Text("Sign In"),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
         }
 
         if (controller.isLoading.value) {

@@ -984,6 +984,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.5.2"
+  profanity_filter:
+    dependency: "direct main"
+    description:
+      name: profanity_filter
+      sha256: afe466d42a2763a5b86849192bee3337de45a9566d5915a0fe4aa5f9cd2e8ac4
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.0.0"
   pub_semver:
     dependency: transitive
     description:
@@ -1008,6 +1016,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.28.0"
+  safe_text:
+    dependency: "direct main"
+    description:
+      name: safe_text
+      sha256: "724a88d6c60de8cc5f85e3b5a1a50ce7c088f521bae6fa74f411a3662f3ea1da"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.1.5"
   shared_preferences:
     dependency: transitive
     description:

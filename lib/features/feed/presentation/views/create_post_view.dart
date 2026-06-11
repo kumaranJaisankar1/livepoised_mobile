@@ -8,9 +8,13 @@ class CreatePostView extends GetView<CreatePostController> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isLight = theme.brightness == Brightness.light;
+    final pageBgColor = isLight ? const Color(0xFFF2F4F8) : null;
 
     return Scaffold(
+      backgroundColor: pageBgColor,
       appBar: AppBar(
+        backgroundColor: pageBgColor,
         title: Text(controller.isEditMode.value ? 'Edit Post' : 'Create Forum Post'),
         actions: [
           Obx(() => TextButton(
@@ -43,9 +47,9 @@ class CreatePostView extends GetView<CreatePostController> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+                  color: isLight ? Colors.white : theme.colorScheme.surfaceVariant.withOpacity(0.3),
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.transparent),
+                  border: isLight ? Border.all(color: const Color(0xFFE2E8F0)) : Border.all(color: Colors.transparent),
                 ),
                 child: DropdownButtonHideUnderline(
                   child: DropdownButton<String>(
@@ -77,14 +81,14 @@ class CreatePostView extends GetView<CreatePostController> {
                   hintText: 'Give your post a clear title',
                   hintStyle: TextStyle(color: theme.hintColor.withOpacity(0.4)),
                   filled: true,
-                  fillColor: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+                  fillColor: isLight ? Colors.white : theme.colorScheme.surfaceVariant.withOpacity(0.3),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
                     borderSide: BorderSide.none,
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
+                    borderSide: isLight ? const BorderSide(color: Color(0xFFE2E8F0)) : BorderSide.none,
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
@@ -104,14 +108,14 @@ class CreatePostView extends GetView<CreatePostController> {
                   hintText: 'Share your thoughts, story, or question...',
                   hintStyle: TextStyle(color: theme.hintColor.withOpacity(0.4)),
                   filled: true,
-                  fillColor: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+                  fillColor: isLight ? Colors.white : theme.colorScheme.surfaceVariant.withOpacity(0.3),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
                     borderSide: BorderSide.none,
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
+                    borderSide: isLight ? const BorderSide(color: Color(0xFFE2E8F0)) : BorderSide.none,
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
@@ -135,14 +139,14 @@ class CreatePostView extends GetView<CreatePostController> {
                   hintText: 'https://youtube.com/...',
                   hintStyle: TextStyle(color: theme.hintColor.withOpacity(0.4)),
                   filled: true,
-                  fillColor: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+                  fillColor: isLight ? Colors.white : theme.colorScheme.surfaceVariant.withOpacity(0.3),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
                     borderSide: BorderSide.none,
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
+                    borderSide: isLight ? const BorderSide(color: Color(0xFFE2E8F0)) : BorderSide.none,
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
@@ -304,6 +308,7 @@ class _TagInputState extends State<_TagInput> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isLight = theme.brightness == Brightness.light;
     return TextField(
       controller: controller,
       style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
@@ -311,7 +316,7 @@ class _TagInputState extends State<_TagInput> {
         hintText: 'Add a tag and press enter',
         hintStyle: TextStyle(color: theme.hintColor.withOpacity(0.4)),
         filled: true,
-        fillColor: theme.colorScheme.surfaceVariant.withOpacity(0.3),
+        fillColor: isLight ? Colors.white : theme.colorScheme.surfaceVariant.withOpacity(0.3),
         suffixIcon: IconButton(
           icon: const Icon(Icons.add),
           onPressed: () {
@@ -325,7 +330,7 @@ class _TagInputState extends State<_TagInput> {
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide.none,
+          borderSide: isLight ? const BorderSide(color: Color(0xFFE2E8F0)) : BorderSide.none,
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),

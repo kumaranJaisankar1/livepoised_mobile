@@ -19,6 +19,7 @@ class AuthController extends GetxController {
 
   final isLoggedIn = false.obs;
   final isLoading = false.obs;
+  final isAuthChecked = false.obs;
   final userProfile = Rxn<UserModel>();
 
   final rememberMe = false.obs;
@@ -43,26 +44,30 @@ class AuthController extends GetxController {
   }
 
   Future<void> checkAuthStatus() async {
-    final token = await _storage.getAccessToken();
-    if (token == null) {
-      isLoggedIn.value = false;
-      Get.offAllNamed('/login');
-      return;
-    }
+    try {
+      final token = await _storage.getAccessToken();
+      if (token == null) {
+        isLoggedIn.value = false;
+        Get.offAllNamed('/login');
+        return;
+      }
 
-    // Try to refresh token to see if it's still valid or can be renewed
-    final canRefresh = await _authService.refreshToken();
-    if (canRefresh) {
-      final profile = await _storage.getUserProfile();
-      userProfile.value = profile;
-      isLoggedIn.value = true;
-      _fetchInitialData();
-      Get.offAllNamed('/');
-    } else {
-      isLoggedIn.value = false;
-      userProfile.value = null;
-      await _storage.clearAll();
-      Get.offAllNamed('/login');
+      // Try to refresh token to see if it's still valid or can be renewed
+      final canRefresh = await _authService.refreshToken();
+      if (canRefresh) {
+        final profile = await _storage.getUserProfile();
+        userProfile.value = profile;
+        isLoggedIn.value = true;
+        _fetchInitialData();
+        Get.offAllNamed('/');
+      } else {
+        isLoggedIn.value = false;
+        userProfile.value = null;
+        await _storage.clearAll();
+        Get.offAllNamed('/login');
+      }
+    } finally {
+      isAuthChecked.value = true;
     }
   }
 

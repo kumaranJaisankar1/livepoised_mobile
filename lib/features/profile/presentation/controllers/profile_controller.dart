@@ -80,6 +80,11 @@ class ProfileController extends GetxController {
     super.onInit();
     _loadFromCache();
     refreshProfile();
+    ever(_authController.isLoggedIn, (bool loggedIn) {
+      if (loggedIn) {
+        refreshProfile();
+      }
+    });
   }
 
   void _loadFromCache() {

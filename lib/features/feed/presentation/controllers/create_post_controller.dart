@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:profanity_filter/profanity_filter.dart';
 import '../../data/models/community_model.dart';
 import '../../data/models/create_post_request.dart';
 import '../../../auth/auth_controller.dart';
@@ -95,6 +96,46 @@ class CreatePostController extends GetxController {
     }
     if (selectedCommunity.value == null) {
       Get.snackbar('Error', 'Please select a community');
+      return;
+    }
+
+    final filter = ProfanityFilter();
+    final hasTitleProfanity = filter.hasProfanity(titleController.text);
+    final hasContentProfanity = filter.hasProfanity(contentController.text);
+
+    if (hasTitleProfanity || hasContentProfanity) {
+      Get.dialog(
+        AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.warning_rounded, color: Colors.orangeAccent),
+              SizedBox(width: 8),
+              Text('Content Warning'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Your post ${hasTitleProfanity && hasContentProfanity ? "title and content" : hasTitleProfanity ? "title" : "content"} contains objectionable language.',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Please edit the text to use appropriate alternative or search terms before posting.',
+              ),
+            ],
+          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          actions: [
+            TextButton(
+              onPressed: () => Get.back(),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
       return;
     }
 

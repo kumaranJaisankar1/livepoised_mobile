@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:livepoised_mobile/features/feed/data/models/comment.dart';
 import 'package:livepoised_mobile/features/feed/data/models/post.dart';
+import 'package:safe_text/safe_text.dart';
 import '../../data/models/post_detail_response.dart';
 import '../../services/feed_service.dart';
 import '../../../auth/auth_controller.dart';
@@ -112,7 +113,11 @@ class PostDetailsController extends GetxController {
 
     isLoading.value = true;
     try {
-      final success = await _feedService.createComment(post.value!.id, text, parentId: parentId);
+      final maskedText = SafeTextFilter.filterText(
+        text: text,
+        strategy: MaskStrategy.partial(obscureSymbol: '*'),
+      );
+      final success = await _feedService.createComment(post.value!.id, maskedText, parentId: parentId);
       if (success) {
         // Refresh comments
         clearReply();
@@ -147,7 +152,11 @@ class PostDetailsController extends GetxController {
   Future<void> updateComment(dynamic commentId, String text) async {
     isLoading.value = true;
     try {
-      final success = await _feedService.updateComment(commentId, text);
+      final maskedText = SafeTextFilter.filterText(
+        text: text,
+        strategy: MaskStrategy.partial(obscureSymbol: '*'),
+      );
+      final success = await _feedService.updateComment(commentId, maskedText);
       if (success) {
         await fetchPostDetails(post.value!.id);
         Get.snackbar('Success', 'Comment updated');
