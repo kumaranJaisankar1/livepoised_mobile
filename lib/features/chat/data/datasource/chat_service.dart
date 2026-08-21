@@ -2,6 +2,7 @@ import 'package:livepoised_mobile/core/network/dio_client.dart';
 import 'package:livepoised_mobile/core/constants/api_endpoints.dart';
 import '../models/chat_connection.dart';
 import '../models/chat_message.dart';
+import '../models/chat_history_response.dart';
 import '../models/inbox_item.dart';
 
 class ChatService {
@@ -46,17 +47,30 @@ class ChatService {
     }
   }
 
-  Future<List<ChatMessage>> getChatHistory(String current, String other) async {
+  Future<ChatHistoryResponse> getChatHistory(
+    String current,
+    String other, {
+    dynamic beforeId,
+    int limit = 30,
+  }) async {
     try {
-      final response = await _dioFastAPI.get(ApiEndpoints.getChatHistory(current, other));
-      if (response.statusCode == 200) {
-        final List<dynamic> data = response.data;
-        return data.map((json) => ChatMessage.fromJson(json)).toList();
+      final queryParams = <String, dynamic>{
+        'limit': limit,
+        if (beforeId != null) 'before_id': beforeId,
+      };
+
+      final response = await _dioFastAPI.get(
+        ApiEndpoints.getChatHistory(current, other),
+        queryParameters: queryParams,
+      );
+
+      if (response.statusCode == 200 && response.data != null) {
+        return ChatHistoryResponse.fromJson(response.data);
       }
-      return [];
+      return ChatHistoryResponse(messages: [], nextCursor: null, hasMore: false);
     } catch (e) {
       print('Error fetching chat history: $e');
-      return [];
+      return ChatHistoryResponse(messages: [], nextCursor: null, hasMore: false);
     }
   }
 }

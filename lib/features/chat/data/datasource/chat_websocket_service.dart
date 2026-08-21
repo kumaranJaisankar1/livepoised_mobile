@@ -13,6 +13,9 @@ class ChatWebSocketService extends GetxService {
   final _messageController = StreamController<ChatMessage>.broadcast();
   Stream<ChatMessage> get messages => _messageController.stream;
 
+  final _rawMessageController = StreamController<Map<String, dynamic>>.broadcast();
+  Stream<Map<String, dynamic>> get rawMessages => _rawMessageController.stream;
+
   bool _isConnecting = false;
 
   @override
@@ -49,7 +52,6 @@ class ChatWebSocketService extends GetxService {
     _isConnecting = true;
 
     // Correct format based on guide: wss://{api-host}/chat/ws/{username}
-    // ApiEndpoints.chatWsUrl is currently "wss://livepoised.vannadev.com/fastapi"
     final wsUrl = '${ApiEndpoints.chatWsUrl}/chat/ws/$username';
     print('ChatWebSocketService: Attempting to connect to $wsUrl');
 
@@ -61,15 +63,24 @@ class ChatWebSocketService extends GetxService {
           print('ChatWebSocketService: Received message: $message');
           try {
             final data = jsonDecode(message);
-            // Case 1: Standard JSON message
-            final chatMsg = ChatMessage(
-              id: DateTime.now().millisecondsSinceEpoch.toString(),
-              senderUsername: data['sender_username'] ?? '',
-              receiverUsername: data['receiver_username'] ?? '',
-              content: data['content'] ?? '',
-              timestamp: DateTime.tryParse(data['timestamp'] ?? '') ?? DateTime.now(),
-            );
-            _messageController.add(chatMsg);
+            if (data is Map<String, dynamic>) {
+              _rawMessageController.add(data);
+
+              // Case 1: Standard JSON message
+              final type = data['type'] as String?;
+              final content = data['content'] as String?;
+
+              if (content != null && content.trim().isNotEmpty && (type == null || type == 'chat' || !type.startsWith('call:'))) {
+                final chatMsg = ChatMessage(
+                  id: data['id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
+                  senderUsername: data['sender_username'] ?? data['sender'] ?? '',
+                  receiverUsername: data['receiver_username'] ?? data['receiver'] ?? '',
+                  content: content.trim(),
+                  timestamp: DateTime.tryParse(data['timestamp'] ?? '') ?? DateTime.now(),
+                );
+                _messageController.add(chatMsg);
+              }
+            }
           } catch (e) {
             // Case 2: Handle plain text echo "You to {username}: {content}"
             final String msgStr = message.toString();
@@ -101,11 +112,12 @@ class ChatWebSocketService extends GetxService {
           _reconnect();
         },
         onError: (error) {
-          print('ChatWebSocketService: WebSocket Error: $error');
+          print('ChatWebSocketService: Handled network disconnect: $error');
           _channel = null;
           _isConnecting = false;
           _reconnect();
         },
+        cancelOnError: false,
       );
       print('ChatWebSocketService: Connection established successfully');
     } catch (e) {
@@ -116,13 +128,17 @@ class ChatWebSocketService extends GetxService {
 
   void disconnect() {
     print('ChatWebSocketService: Disconnecting');
-    _channel?.sink.close();
+    try {
+      _channel?.sink.close();
+    } catch (_) {}
     _channel = null;
     _isConnecting = false;
   }
 
   void _reconnect() {
-    Timer(const Duration(seconds: 5), () => connect());
+    if (_authController.userProfile.value != null && _channel == null && !_isConnecting) {
+      Timer(const Duration(seconds: 3), () => connect());
+    }
   }
 
   void sendMessage(String text, String recipientUsername) {
@@ -139,10 +155,32 @@ class ChatWebSocketService extends GetxService {
     }
   }
 
+  void sendTypingStatus(String recipientUsername, bool isTyping) {
+    if (_channel != null) {
+      _channel!.sink.add(
+        jsonEncode({
+          'type': 'typing',
+          'receiver': recipientUsername,
+          'is_typing': isTyping,
+        }),
+      );
+    }
+  }
+
+  void sendRaw(Map<String, dynamic> data) {
+    if (_channel != null) {
+      print('ChatWebSocketService: Sending raw frame: $data');
+      _channel!.sink.add(jsonEncode(data));
+    } else {
+      print('ChatWebSocketService: WebSocket not connected, cannot send raw frame');
+    }
+  }
+
   @override
   void onClose() {
     _channel?.sink.close();
     _messageController.close();
+    _rawMessageController.close();
     super.onClose();
   }
 }

@@ -17,6 +17,7 @@ _$InboxItemImpl _$$InboxItemImplFromJson(Map<String, dynamic> json) =>
       otherUserImageUrl: json['other_user_image_url'] as String?,
       otherUserFirstName: json['other_user_first_name'] as String?,
       otherUserLastName: json['other_user_last_name'] as String?,
+      unreadCount: (json['unread_count'] as num?)?.toInt() ?? 0,
     );
 
 Map<String, dynamic> _$$InboxItemImplToJson(_$InboxItemImpl instance) =>
@@ -30,4 +31,5 @@ Map<String, dynamic> _$$InboxItemImplToJson(_$InboxItemImpl instance) =>
       'other_user_image_url': instance.otherUserImageUrl,
       'other_user_first_name': instance.otherUserFirstName,
       'other_user_last_name': instance.otherUserLastName,
+      'unread_count': instance.unreadCount,
     };

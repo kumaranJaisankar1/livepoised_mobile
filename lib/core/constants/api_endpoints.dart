@@ -69,6 +69,7 @@ class ApiEndpoints {
   static String startChatInbox(String otherUsername, String currentUsername) => '$baseUrlFastAPI/chat/inbox/start/$otherUsername?username=$currentUsername';
   static String getChatHistory(String current, String other) => '$baseUrlFastAPI/chat/history/$current/$other';
   static String get chatWsUrl => baseWSURL;
+  static String get livekitWsUrl => dotenv.get('WS_URL_LIVEKIT', fallback: 'ws://localhost:7880');
 
   // Ally Network Requests (Spring Boot)
   static String get incomingAllyRequests => '$baseUrlSpringBoot/api/allies/requests/received';

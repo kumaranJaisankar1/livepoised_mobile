@@ -12,7 +12,7 @@ class Connection with _$Connection {
     @JsonKey(name: 'firstName') String? firstName,
     @JsonKey(name: 'lastName') String? lastName,
     @JsonKey(name: 'profileImage') String? imageUrl,
-    String? relationship, // e.g., "Ally", "Parent", "Caregiver"
+    String? relationship,
     @JsonKey(name: 'connectionType') String? connectionType,
   }) = _Connection;
 
@@ -32,15 +32,15 @@ class NetworkRequest with _$NetworkRequest {
 
   const factory NetworkRequest({
     required dynamic id,
-    @JsonKey(name: 'linkId') dynamic linkId, // For Supporter requests
-    @JsonKey(name: 'mentorUsername') String? mentorUsername, // For Ally requests
-    @JsonKey(name: 'menteeUsername') String? menteeUsername, // For Ally requests
-    @JsonKey(name: 'username') String? username, // For Supporter requests
+    @JsonKey(name: 'linkId') dynamic linkId,
+    @JsonKey(name: 'mentorUsername') String? mentorUsername,
+    @JsonKey(name: 'menteeUsername') String? menteeUsername,
+    @JsonKey(name: 'username') String? username,
     @JsonKey(name: 'firstName') String? firstName,
     @JsonKey(name: 'lastName') String? lastName,
     @JsonKey(name: 'preferredName') String? preferredName,
     @JsonKey(name: 'profileImage') String? senderImageUrl,
-    required String type, // "Ally" or "Supporter"
+    required String type,
     String? relationship,
     @JsonKey(name: 'createdAt') DateTime? createdAt,
     String? status,

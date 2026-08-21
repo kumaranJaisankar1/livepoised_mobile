@@ -1,8 +1,10 @@
 import 'dart:async';
 
 import 'package:get/get.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:get_storage/get_storage.dart';
+import '../../../../firebase_options.dart';
 import '../../data/models/notification_model.dart';
 import '../../data/services/notification_service.dart';
 
@@ -29,14 +31,25 @@ class NotificationController extends GetxController {
       fetchNotifications();
       startPolling();
       _setupTokenRefreshListener();
+      updateDeviceToken();
     }
   }
 
-  void _setupTokenRefreshListener() {
-    _tokenRefreshSubscription?.cancel();
-    _tokenRefreshSubscription = FirebaseMessaging.instance.onTokenRefresh.listen((newToken) {
-      updateDeviceToken(newToken: newToken);
-    });
+  void _setupTokenRefreshListener() async {
+    try {
+      if (Firebase.apps.isEmpty) {
+        await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+      }
+    } catch (_) {}
+
+    try {
+      _tokenRefreshSubscription?.cancel();
+      _tokenRefreshSubscription = FirebaseMessaging.instance.onTokenRefresh.listen((newToken) {
+        updateDeviceToken(newToken: newToken);
+      });
+    } catch (e) {
+      print('NotificationController: FirebaseMessaging listener skipped: $e');
+    }
   }
 
   void _loadSettings() {
@@ -49,6 +62,7 @@ class NotificationController extends GetxController {
     if (value) {
       fetchNotifications();
       startPolling();
+      updateDeviceToken();
     } else {
       _pollingTimer?.cancel();
       unreadCount.value = 0;
@@ -64,12 +78,19 @@ class NotificationController extends GetxController {
 
   Future<void> updateDeviceToken({String? newToken}) async {
     try {
-      final fcmToken = newToken ?? await FirebaseMessaging.instance.getToken();
-      if (fcmToken == null) return;
+      if (Firebase.apps.isEmpty) {
+        try {
+          await Firebase.initializeApp();
+        } catch (_) {
+          await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+        }
+      }
+    } catch (_) {}
 
-      final lastToken = _box.read(_fcmTokenKey);
-      if (lastToken == fcmToken && newToken == null) {
-        print('FCM Token already registered and unchanged.');
+    try {
+      final fcmToken = newToken ?? await FirebaseMessaging.instance.getToken();
+      if (fcmToken == null) {
+        print('NotificationController: FCM Token is null.');
         return;
       }
 
@@ -79,6 +100,7 @@ class NotificationController extends GetxController {
         await _box.write(_deviceIdKey, deviceId);
       }
 
+      print('NotificationController: Registering FCM token ($fcmToken) with Spring Boot...');
       final success = await _service.registerDeviceToken(
         fcmToken: fcmToken,
         deviceId: deviceId,
@@ -86,7 +108,7 @@ class NotificationController extends GetxController {
 
       if (success) {
         await _box.write(_fcmTokenKey, fcmToken);
-        print('Successfully registered device token with backend.');
+        print('NotificationController: Successfully registered device token with Spring Boot backend.');
       }
     } catch (e) {
       print('Error in updateDeviceToken: $e');

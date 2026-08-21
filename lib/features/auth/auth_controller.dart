@@ -52,8 +52,12 @@ class AuthController extends GetxController {
         return;
       }
 
-      // Try to refresh token to see if it's still valid or can be renewed
-      final canRefresh = await _authService.refreshToken();
+      // Try to refresh token to see if it's still valid or can be renewed, with 4s timeout
+      final canRefresh = await _authService.refreshToken().timeout(
+        const Duration(seconds: 4),
+        onTimeout: () => false,
+      );
+
       if (canRefresh) {
         final profile = await _storage.getUserProfile();
         userProfile.value = profile;
@@ -66,6 +70,11 @@ class AuthController extends GetxController {
         await _storage.clearAll();
         Get.offAllNamed('/login');
       }
+    } catch (e) {
+      print('Error checking auth status: $e');
+      isLoggedIn.value = false;
+      userProfile.value = null;
+      Get.offAllNamed('/login');
     } finally {
       isAuthChecked.value = true;
     }

@@ -38,6 +38,8 @@ mixin _$InboxItem {
   String? get otherUserFirstName => throw _privateConstructorUsedError;
   @JsonKey(name: 'other_user_last_name')
   String? get otherUserLastName => throw _privateConstructorUsedError;
+  @JsonKey(name: 'unread_count')
+  int? get unreadCount => throw _privateConstructorUsedError;
 
   /// Serializes this InboxItem to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -64,6 +66,7 @@ abstract class $InboxItemCopyWith<$Res> {
     @JsonKey(name: 'other_user_image_url') String? otherUserImageUrl,
     @JsonKey(name: 'other_user_first_name') String? otherUserFirstName,
     @JsonKey(name: 'other_user_last_name') String? otherUserLastName,
+    @JsonKey(name: 'unread_count') int? unreadCount,
   });
 }
 
@@ -91,6 +94,7 @@ class _$InboxItemCopyWithImpl<$Res, $Val extends InboxItem>
     Object? otherUserImageUrl = freezed,
     Object? otherUserFirstName = freezed,
     Object? otherUserLastName = freezed,
+    Object? unreadCount = freezed,
   }) {
     return _then(
       _value.copyWith(
@@ -130,6 +134,10 @@ class _$InboxItemCopyWithImpl<$Res, $Val extends InboxItem>
                 ? _value.otherUserLastName
                 : otherUserLastName // ignore: cast_nullable_to_non_nullable
                       as String?,
+            unreadCount: freezed == unreadCount
+                ? _value.unreadCount
+                : unreadCount // ignore: cast_nullable_to_non_nullable
+                      as int?,
           )
           as $Val,
     );
@@ -155,6 +163,7 @@ abstract class _$$InboxItemImplCopyWith<$Res>
     @JsonKey(name: 'other_user_image_url') String? otherUserImageUrl,
     @JsonKey(name: 'other_user_first_name') String? otherUserFirstName,
     @JsonKey(name: 'other_user_last_name') String? otherUserLastName,
+    @JsonKey(name: 'unread_count') int? unreadCount,
   });
 }
 
@@ -181,6 +190,7 @@ class __$$InboxItemImplCopyWithImpl<$Res>
     Object? otherUserImageUrl = freezed,
     Object? otherUserFirstName = freezed,
     Object? otherUserLastName = freezed,
+    Object? unreadCount = freezed,
   }) {
     return _then(
       _$InboxItemImpl(
@@ -220,6 +230,10 @@ class __$$InboxItemImplCopyWithImpl<$Res>
             ? _value.otherUserLastName
             : otherUserLastName // ignore: cast_nullable_to_non_nullable
                   as String?,
+        unreadCount: freezed == unreadCount
+            ? _value.unreadCount
+            : unreadCount // ignore: cast_nullable_to_non_nullable
+                  as int?,
       ),
     );
   }
@@ -238,6 +252,7 @@ class _$InboxItemImpl implements _InboxItem {
     @JsonKey(name: 'other_user_image_url') this.otherUserImageUrl,
     @JsonKey(name: 'other_user_first_name') this.otherUserFirstName,
     @JsonKey(name: 'other_user_last_name') this.otherUserLastName,
+    @JsonKey(name: 'unread_count') this.unreadCount = 0,
   });
 
   factory _$InboxItemImpl.fromJson(Map<String, dynamic> json) =>
@@ -269,10 +284,13 @@ class _$InboxItemImpl implements _InboxItem {
   @override
   @JsonKey(name: 'other_user_last_name')
   final String? otherUserLastName;
+  @override
+  @JsonKey(name: 'unread_count')
+  final int? unreadCount;
 
   @override
   String toString() {
-    return 'InboxItem(otherUsername: $otherUsername, lastMessage: $lastMessage, timestamp: $timestamp, isEncrypted: $isEncrypted, senderUsername: $senderUsername, receiverUsername: $receiverUsername, otherUserImageUrl: $otherUserImageUrl, otherUserFirstName: $otherUserFirstName, otherUserLastName: $otherUserLastName)';
+    return 'InboxItem(otherUsername: $otherUsername, lastMessage: $lastMessage, timestamp: $timestamp, isEncrypted: $isEncrypted, senderUsername: $senderUsername, receiverUsername: $receiverUsername, otherUserImageUrl: $otherUserImageUrl, otherUserFirstName: $otherUserFirstName, otherUserLastName: $otherUserLastName, unreadCount: $unreadCount)';
   }
 
   @override
@@ -297,7 +315,9 @@ class _$InboxItemImpl implements _InboxItem {
             (identical(other.otherUserFirstName, otherUserFirstName) ||
                 other.otherUserFirstName == otherUserFirstName) &&
             (identical(other.otherUserLastName, otherUserLastName) ||
-                other.otherUserLastName == otherUserLastName));
+                other.otherUserLastName == otherUserLastName) &&
+            (identical(other.unreadCount, unreadCount) ||
+                other.unreadCount == unreadCount));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -313,6 +333,7 @@ class _$InboxItemImpl implements _InboxItem {
     otherUserImageUrl,
     otherUserFirstName,
     otherUserLastName,
+    unreadCount,
   );
 
   /// Create a copy of InboxItem
@@ -340,6 +361,7 @@ abstract class _InboxItem implements InboxItem {
     @JsonKey(name: 'other_user_image_url') final String? otherUserImageUrl,
     @JsonKey(name: 'other_user_first_name') final String? otherUserFirstName,
     @JsonKey(name: 'other_user_last_name') final String? otherUserLastName,
+    @JsonKey(name: 'unread_count') final int? unreadCount,
   }) = _$InboxItemImpl;
 
   factory _InboxItem.fromJson(Map<String, dynamic> json) =
@@ -371,6 +393,9 @@ abstract class _InboxItem implements InboxItem {
   @override
   @JsonKey(name: 'other_user_last_name')
   String? get otherUserLastName;
+  @override
+  @JsonKey(name: 'unread_count')
+  int? get unreadCount;
 
   /// Create a copy of InboxItem
   /// with the given fields replaced by the non-null parameter values.

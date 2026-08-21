@@ -20,7 +20,6 @@ class NotificationModel with _$NotificationModel {
 
   factory NotificationModel.fromJson(Map<String, dynamic> json) => _$NotificationModelFromJson(json);
 
-  // Helper for deep linking
   NotificationType get notificationType {
     switch (type) {
       case 'ALLY_REQUEST':

@@ -15,7 +15,7 @@ class ChatMessage with _$ChatMessage {
     required DateTime timestamp,
     @JsonKey(name: 'updated_at') DateTime? updatedAt,
     @JsonKey(name: 'is_encrypted') @Default(false) bool isEncrypted,
-    @Default(false) bool isOptimistic,
+    @JsonKey(name: 'is_optimistic') @Default(false) bool isOptimistic,
   }) = _ChatMessage;
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) => _$ChatMessageFromJson(json);

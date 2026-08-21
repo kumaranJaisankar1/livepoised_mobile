@@ -15,6 +15,7 @@ class InboxItem with _$InboxItem {
     @JsonKey(name: 'other_user_image_url') String? otherUserImageUrl,
     @JsonKey(name: 'other_user_first_name') String? otherUserFirstName,
     @JsonKey(name: 'other_user_last_name') String? otherUserLastName,
+    @JsonKey(name: 'unread_count') @Default(0) int? unreadCount,
   }) = _InboxItem;
 
   factory InboxItem.fromJson(Map<String, dynamic> json) => _$InboxItemFromJson(json);

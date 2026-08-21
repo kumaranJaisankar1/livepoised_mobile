@@ -48,6 +48,8 @@ class ChatListController extends GetxController {
     searchTextController.clear();
   }
 
+  int get totalUnreadCount => inboxItems.fold(0, (sum, item) => sum + (item.unreadCount ?? 0));
+
   @override
   void onClose() {
     searchTextController.dispose();
@@ -67,9 +69,10 @@ class ChatListController extends GetxController {
     isLoading.value = true;
     try {
       final fetchedInbox = await _chatService.getInbox(username);
+      fetchedInbox.sort((a, b) => (b.timestamp ?? DateTime.now()).compareTo(a.timestamp ?? DateTime.now()));
       inboxItems.assignAll(fetchedInbox);
     } catch (e) {
-      Get.snackbar('Error', 'Failed to load inbox');
+      print('ChatListController: Error fetching inbox: $e');
     } finally {
       isLoading.value = false;
     }

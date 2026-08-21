@@ -1,0 +1,17 @@
+targets:
+  $default:
+    builders:
+      freezed:
+        generate_for:
+          - lib/features/chat/data/models/*.dart
+          - lib/features/feed/data/models/*.dart
+          - lib/features/network/data/models/*.dart
+          - lib/features/notification/data/models/*.dart
+          - lib/core/models/*.dart
+      json_serializable:
+        generate_for:
+          - lib/features/chat/data/models/*.dart
+          - lib/features/feed/data/models/*.dart
+          - lib/features/network/data/models/*.dart
+          - lib/features/notification/data/models/*.dart
+          - lib/core/models/*.dart

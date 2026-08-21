@@ -81,6 +81,15 @@
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>This app needs access to your gallery to upload a profile photo.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>This app needs access to your camera to take a profile photo.</string>
+	<string>Live Poised needs camera access for video calls and profile photos.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Live Poised needs microphone access for high-definition voice and video calls.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>voip</string>
+		<string>audio</string>
+		<string>fetch</string>
+		<string>remote-notification</string>
+	</array>
 </dict>
 </plist>

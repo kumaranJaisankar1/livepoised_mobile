@@ -28,8 +28,7 @@ mixin _$Connection {
   String? get lastName => throw _privateConstructorUsedError;
   @JsonKey(name: 'profileImage')
   String? get imageUrl => throw _privateConstructorUsedError;
-  String? get relationship =>
-      throw _privateConstructorUsedError; // e.g., "Ally", "Parent", "Caregiver"
+  String? get relationship => throw _privateConstructorUsedError;
   @JsonKey(name: 'connectionType')
   String? get connectionType => throw _privateConstructorUsedError;
 
@@ -213,7 +212,6 @@ class _$ConnectionImpl extends _Connection {
   final String? imageUrl;
   @override
   final String? relationship;
-  // e.g., "Ally", "Parent", "Caregiver"
   @override
   @JsonKey(name: 'connectionType')
   final String? connectionType;
@@ -294,7 +292,7 @@ abstract class _Connection extends Connection {
   @JsonKey(name: 'profileImage')
   String? get imageUrl;
   @override
-  String? get relationship; // e.g., "Ally", "Parent", "Caregiver"
+  String? get relationship;
   @override
   @JsonKey(name: 'connectionType')
   String? get connectionType;
@@ -315,13 +313,13 @@ NetworkRequest _$NetworkRequestFromJson(Map<String, dynamic> json) {
 mixin _$NetworkRequest {
   dynamic get id => throw _privateConstructorUsedError;
   @JsonKey(name: 'linkId')
-  dynamic get linkId => throw _privateConstructorUsedError; // For Supporter requests
+  dynamic get linkId => throw _privateConstructorUsedError;
   @JsonKey(name: 'mentorUsername')
-  String? get mentorUsername => throw _privateConstructorUsedError; // For Ally requests
+  String? get mentorUsername => throw _privateConstructorUsedError;
   @JsonKey(name: 'menteeUsername')
-  String? get menteeUsername => throw _privateConstructorUsedError; // For Ally requests
+  String? get menteeUsername => throw _privateConstructorUsedError;
   @JsonKey(name: 'username')
-  String? get username => throw _privateConstructorUsedError; // For Supporter requests
+  String? get username => throw _privateConstructorUsedError;
   @JsonKey(name: 'firstName')
   String? get firstName => throw _privateConstructorUsedError;
   @JsonKey(name: 'lastName')
@@ -330,8 +328,7 @@ mixin _$NetworkRequest {
   String? get preferredName => throw _privateConstructorUsedError;
   @JsonKey(name: 'profileImage')
   String? get senderImageUrl => throw _privateConstructorUsedError;
-  String get type =>
-      throw _privateConstructorUsedError; // "Ally" or "Supporter"
+  String get type => throw _privateConstructorUsedError;
   String? get relationship => throw _privateConstructorUsedError;
   @JsonKey(name: 'createdAt')
   DateTime? get createdAt => throw _privateConstructorUsedError;
@@ -600,19 +597,15 @@ class _$NetworkRequestImpl extends _NetworkRequest {
   @override
   @JsonKey(name: 'linkId')
   final dynamic linkId;
-  // For Supporter requests
   @override
   @JsonKey(name: 'mentorUsername')
   final String? mentorUsername;
-  // For Ally requests
   @override
   @JsonKey(name: 'menteeUsername')
   final String? menteeUsername;
-  // For Ally requests
   @override
   @JsonKey(name: 'username')
   final String? username;
-  // For Supporter requests
   @override
   @JsonKey(name: 'firstName')
   final String? firstName;
@@ -627,7 +620,6 @@ class _$NetworkRequestImpl extends _NetworkRequest {
   final String? senderImageUrl;
   @override
   final String type;
-  // "Ally" or "Supporter"
   @override
   final String? relationship;
   @override
@@ -731,16 +723,16 @@ abstract class _NetworkRequest extends NetworkRequest {
   dynamic get id;
   @override
   @JsonKey(name: 'linkId')
-  dynamic get linkId; // For Supporter requests
+  dynamic get linkId;
   @override
   @JsonKey(name: 'mentorUsername')
-  String? get mentorUsername; // For Ally requests
+  String? get mentorUsername;
   @override
   @JsonKey(name: 'menteeUsername')
-  String? get menteeUsername; // For Ally requests
+  String? get menteeUsername;
   @override
   @JsonKey(name: 'username')
-  String? get username; // For Supporter requests
+  String? get username;
   @override
   @JsonKey(name: 'firstName')
   String? get firstName;
@@ -754,7 +746,7 @@ abstract class _NetworkRequest extends NetworkRequest {
   @JsonKey(name: 'profileImage')
   String? get senderImageUrl;
   @override
-  String get type; // "Ally" or "Supporter"
+  String get type;
   @override
   String? get relationship;
   @override

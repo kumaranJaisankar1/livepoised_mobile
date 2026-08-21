@@ -17,7 +17,7 @@ _$ChatMessageImpl _$$ChatMessageImplFromJson(Map<String, dynamic> json) =>
           ? null
           : DateTime.parse(json['updated_at'] as String),
       isEncrypted: json['is_encrypted'] as bool? ?? false,
-      isOptimistic: json['isOptimistic'] as bool? ?? false,
+      isOptimistic: json['is_optimistic'] as bool? ?? false,
     );
 
 Map<String, dynamic> _$$ChatMessageImplToJson(_$ChatMessageImpl instance) =>
@@ -29,5 +29,5 @@ Map<String, dynamic> _$$ChatMessageImplToJson(_$ChatMessageImpl instance) =>
       'timestamp': instance.timestamp.toIso8601String(),
       'updated_at': instance.updatedAt?.toIso8601String(),
       'is_encrypted': instance.isEncrypted,
-      'isOptimistic': instance.isOptimistic,
+      'is_optimistic': instance.isOptimistic,
     };

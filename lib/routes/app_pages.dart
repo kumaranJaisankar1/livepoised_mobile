@@ -29,6 +29,8 @@ import '../features/neuro_wellness/presentation/views/neuro_wellness_lobby_view.
 import '../features/neuro_wellness/presentation/controllers/neuro_wellness_controller.dart';
 import '../features/neuro_wellness/presentation/views/memory_recall_game_view.dart';
 import '../features/neuro_wellness/presentation/views/zen_flow_view.dart';
+import '../features/call/presentation/views/incoming_call_view.dart';
+import '../features/call/presentation/views/active_call_view.dart';
 
 class AppPages {
   static const initial = '/splash';
@@ -62,7 +64,9 @@ class AppPages {
       binding: BindingsBuilder(() {
         Get.lazyPut(() => MainLayoutController());
         Get.lazyPut(() => FeedController());
-        Get.lazyPut(() => ProfileController());
+        if (!Get.isRegistered<ProfileController>()) {
+          Get.lazyPut(() => ProfileController(), fenix: true);
+        }
         Get.lazyPut(() => ChatListController());
         Get.lazyPut(() => NeuroWellnessController());
       }),
@@ -147,6 +151,18 @@ class AppPages {
       name: '/neuro-wellness/zen-flow',
       page: () => const ZenFlowView(),
       middlewares: [AuthMiddleware()],
+    ),
+    GetPage(
+      name: '/incoming-call',
+      page: () => const IncomingCallView(),
+      middlewares: [AuthMiddleware()],
+      fullscreenDialog: true,
+    ),
+    GetPage(
+      name: '/active-call',
+      page: () => const ActiveCallView(),
+      middlewares: [AuthMiddleware()],
+      fullscreenDialog: true,
     ),
   ];
 }

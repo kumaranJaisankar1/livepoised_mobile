@@ -33,6 +33,7 @@ mixin _$ChatMessage {
   DateTime? get updatedAt => throw _privateConstructorUsedError;
   @JsonKey(name: 'is_encrypted')
   bool get isEncrypted => throw _privateConstructorUsedError;
+  @JsonKey(name: 'is_optimistic')
   bool get isOptimistic => throw _privateConstructorUsedError;
 
   /// Serializes this ChatMessage to a JSON map.
@@ -60,7 +61,7 @@ abstract class $ChatMessageCopyWith<$Res> {
     DateTime timestamp,
     @JsonKey(name: 'updated_at') DateTime? updatedAt,
     @JsonKey(name: 'is_encrypted') bool isEncrypted,
-    bool isOptimistic,
+    @JsonKey(name: 'is_optimistic') bool isOptimistic,
   });
 }
 
@@ -145,7 +146,7 @@ abstract class _$$ChatMessageImplCopyWith<$Res>
     DateTime timestamp,
     @JsonKey(name: 'updated_at') DateTime? updatedAt,
     @JsonKey(name: 'is_encrypted') bool isEncrypted,
-    bool isOptimistic,
+    @JsonKey(name: 'is_optimistic') bool isOptimistic,
   });
 }
 
@@ -222,7 +223,7 @@ class _$ChatMessageImpl extends _ChatMessage {
     required this.timestamp,
     @JsonKey(name: 'updated_at') this.updatedAt,
     @JsonKey(name: 'is_encrypted') this.isEncrypted = false,
-    this.isOptimistic = false,
+    @JsonKey(name: 'is_optimistic') this.isOptimistic = false,
   }) : super._();
 
   factory _$ChatMessageImpl.fromJson(Map<String, dynamic> json) =>
@@ -248,7 +249,7 @@ class _$ChatMessageImpl extends _ChatMessage {
   @JsonKey(name: 'is_encrypted')
   final bool isEncrypted;
   @override
-  @JsonKey()
+  @JsonKey(name: 'is_optimistic')
   final bool isOptimistic;
 
   @override
@@ -314,7 +315,7 @@ abstract class _ChatMessage extends ChatMessage {
     required final DateTime timestamp,
     @JsonKey(name: 'updated_at') final DateTime? updatedAt,
     @JsonKey(name: 'is_encrypted') final bool isEncrypted,
-    final bool isOptimistic,
+    @JsonKey(name: 'is_optimistic') final bool isOptimistic,
   }) = _$ChatMessageImpl;
   const _ChatMessage._() : super._();
 
@@ -341,6 +342,7 @@ abstract class _ChatMessage extends ChatMessage {
   @JsonKey(name: 'is_encrypted')
   bool get isEncrypted;
   @override
+  @JsonKey(name: 'is_optimistic')
   bool get isOptimistic;
 
   /// Create a copy of ChatMessage
