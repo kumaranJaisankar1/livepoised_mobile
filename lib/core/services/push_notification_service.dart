@@ -3,13 +3,111 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
+import 'package:dio/dio.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:get_storage/get_storage.dart';
 import '../../features/call/data/livekit_service.dart';
 import '../../features/notification/data/services/notification_service.dart';
+import '../constants/api_endpoints.dart';
+
+const String _pendingCallActionKey = 'pending_call_action';
+
+/// Declines an incoming call without any live GetX/app state — safe to call
+/// from a background isolate (Android, app fully terminated) or before GetX
+/// has finished bootstrapping.
+Future<void> _declineCallHeadless(Map<String, dynamic> data) async {
+  try {
+    if (Firebase.apps.isEmpty) {
+      try {
+        await Firebase.initializeApp();
+      } catch (_) {}
+    }
+    if (!dotenv.isInitialized) {
+      try {
+        await dotenv.load(fileName: '.env.dev');
+      } catch (_) {}
+    }
+
+    const secureStorage = FlutterSecureStorage();
+    final token = await secureStorage.read(key: 'access_token');
+    if (token == null) return;
+
+    final baseUrl = ApiEndpoints.baseUrlFastAPI;
+    final dio = Dio(BaseOptions(
+      baseUrl: baseUrl,
+      connectTimeout: const Duration(seconds: 10),
+      receiveTimeout: const Duration(seconds: 10),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    ));
+
+    await dio.post('/call/decline', data: {
+      'roomId': data['roomId'],
+      'receiver': data['sender'],
+      'senderFullName': data['senderFullName'],
+      'isVideo': data['isVideo'] == 'true' || data['isVideo'] == true,
+    });
+  } catch (e) {
+    print('PNS: Headless decline call failed: $e');
+  }
+}
+
+/// Persists an "accept this call" marker that survives across isolates/cold
+/// starts — works with no GetX/LiveKitService present. `InitialBinding`
+/// consumes it once GetX has actually booted, which avoids a race where the
+/// notification response arrives before `LiveKitService` is registered.
+Future<void> _persistPendingAcceptAction(Map<String, dynamic> data) async {
+  try {
+    await GetStorage.init();
+    final box = GetStorage();
+    await box.write(_pendingCallActionKey, {
+      'action': 'accept',
+      'roomId': data['roomId'],
+      'sender': data['sender'],
+      'senderFullName': data['senderFullName'],
+      'senderImage': data['senderImage'],
+      'isVideo': data['isVideo'] == 'true' || data['isVideo'] == true,
+    });
+  } catch (e) {
+    print('PNS: Failed to persist pending accept action: $e');
+  }
+}
+
+// NOTE: on Android, `showsUserInterface: false` actions (Decline) are always
+// routed here via a dedicated headless FlutterEngine, regardless of whether
+// the main app process is alive — this is the ONLY code path that ever runs
+// for Decline. `showsUserInterface: true` actions (Accept) always launch the
+// Activity directly instead and are delivered via the normal main-isolate
+// `onDidReceiveNotificationResponse` callback below, never here.
+@pragma('vm:entry-point')
+Future<void> _onBackgroundNotificationResponse(NotificationResponse response) async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  final localNotifications = FlutterLocalNotificationsPlugin();
+  try {
+    await localNotifications.cancel(9999);
+  } catch (_) {}
+
+  if (response.payload == null) return;
+  Map<String, dynamic> data;
+  try {
+    data = jsonDecode(response.payload!) as Map<String, dynamic>;
+  } catch (_) {
+    return;
+  }
+
+  if (response.actionId == 'decline_call') {
+    await _declineCallHeadless(data);
+  }
+}
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -194,7 +292,8 @@ class PushNotificationService {
           'decline_call',
           'Decline',
           titleColor: Color(0xFFEF4444),
-          showsUserInterface: true,
+          showsUserInterface: false,
+          cancelNotification: true,
         ),
         AndroidNotificationAction(
           'accept_call',
@@ -316,13 +415,33 @@ class PushNotificationService {
     try {
       const AndroidInitializationSettings androidSettings =
           AndroidInitializationSettings('@mipmap/ic_launcher');
-      const DarwinInitializationSettings iosSettings = DarwinInitializationSettings(
+      final DarwinInitializationSettings iosSettings = DarwinInitializationSettings(
         requestAlertPermission: false,
         requestBadgePermission: false,
         requestSoundPermission: false,
+        notificationCategories: [
+          DarwinNotificationCategory(
+            'incoming_call',
+            actions: [
+              DarwinNotificationAction.plain(
+                'accept_call',
+                'Accept',
+                options: {DarwinNotificationActionOption.foreground},
+              ),
+              // No `.foreground` option: iOS launches the app in the
+              // background to run this action without bringing the UI up.
+              DarwinNotificationAction.plain(
+                'decline_call',
+                'Decline',
+                options: {DarwinNotificationActionOption.destructive},
+              ),
+            ],
+            options: {DarwinNotificationCategoryOption.customDismissAction},
+          ),
+        ],
       );
 
-      const InitializationSettings initSettings = InitializationSettings(
+      final InitializationSettings initSettings = InitializationSettings(
         android: androidSettings,
         iOS: iosSettings,
       );
@@ -336,19 +455,28 @@ class PushNotificationService {
             if (response.payload != null) {
               try {
                 final Map<String, dynamic> data = jsonDecode(response.payload!);
-                handleNavigation(data);
                 if (Get.isRegistered<LiveKitService>()) {
                   Get.find<LiveKitService>().acceptCallWithData(
                     roomId: data['roomId'],
                     caller: data['sender'],
                     isVideo: data['isVideo'] == 'true' || data['isVideo'] == true,
                   );
+                } else {
+                  // Cold start: this callback can fire before InitialBinding
+                  // has registered LiveKitService. Persist the accept intent
+                  // so InitialBinding joins the call directly once it boots,
+                  // instead of falling back to the ringing screen.
+                  _persistPendingAcceptAction(data);
                 }
               } catch (_) {}
             }
           } else if (response.actionId == 'decline_call') {
             if (Get.isRegistered<LiveKitService>()) {
               Get.find<LiveKitService>().declineCall();
+            } else if (response.payload != null) {
+              try {
+                _declineCallHeadless(jsonDecode(response.payload!));
+              } catch (_) {}
             }
           } else if (response.actionId == 'call_back') {
             if (response.payload != null) {
@@ -368,6 +496,7 @@ class PushNotificationService {
             } catch (_) {}
           }
         },
+        onDidReceiveBackgroundNotificationResponse: _onBackgroundNotificationResponse,
       );
     } catch (e) {
       print('PNS Warning: Local notifications initialize error: $e');
@@ -471,7 +600,8 @@ class PushNotificationService {
           'decline_call',
           'Decline',
           titleColor: Color(0xFFEF4444),
-          showsUserInterface: true,
+          showsUserInterface: false,
+          cancelNotification: true,
         ),
         AndroidNotificationAction(
           'accept_call',

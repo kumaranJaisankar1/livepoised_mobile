@@ -11,6 +11,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart' as
 import 'package:get_storage/get_storage.dart';
 
 import '../../../core/services/push_notification_service.dart';
+import '../../../core/services/pip_service.dart';
 import '../../../core/constants/api_endpoints.dart';
 import '../../../core/network/dio_client.dart';
 import '../../auth/auth_controller.dart';
@@ -45,7 +46,11 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
   final isVideoOff = false.obs;
   final isNoiseCancellationOn = true.obs;
   final isScreenSharing = false.obs;
-  final isMinimized = false.obs; // Picture-in-Picture mode
+  final isMinimized = false.obs; // In-app mini window
+  final isInNativePip = false.obs; // Real OS-level Picture-in-Picture (Android)
+  StreamSubscription<bool>? _pipModeSub;
+  StreamSubscription<String>? _pipActionSub;
+  bool _pipPermissionPromptShown = false;
   final connectionQuality = 'excellent'.obs;
   final incomingIsVideo = true.obs;
   final callerUsername = Rxn<String>();
@@ -151,6 +156,14 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
     super.onInit();
     WidgetsBinding.instance.addObserver(this);
     _wsSub = _ws.rawMessages.listen(_handleSignal);
+    _pipModeSub = PipService().onModeChanged.listen((isInPip) {
+      isInNativePip.value = isInPip;
+    });
+    _pipActionSub = PipService().onPipAction.listen((action) {
+      if (action == 'end_call') {
+        endCall();
+      }
+    });
   }
 
   @override
@@ -158,6 +171,8 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _cancelRingingTimer();
     _wsSub?.cancel();
+    _pipModeSub?.cancel();
+    _pipActionSub?.cancel();
     _cleanupAndPop();
     super.onClose();
   }
@@ -247,6 +262,7 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
           _connectedStartTime = DateTime.now();
           _startDurationTimer();
           _showOngoingCallNotification();
+          _onCallConnected();
           try {
             WakelockPlus.enable();
           } catch (_) {}
@@ -403,6 +419,7 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
     _connectedStartTime = DateTime.now();
     _startDurationTimer();
     _showOngoingCallNotification();
+    _onCallConnected();
     try {
       WakelockPlus.enable();
     } catch (_) {}
@@ -777,9 +794,44 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
     } catch (_) {}
   }
 
+  void _onCallConnected() {
+    PipService().setCallActive(true);
+    _maybePromptPipPermission();
+  }
+
+  static const String _pipPromptShownKey = 'pip_permission_prompt_shown';
+
+  Future<void> _maybePromptPipPermission() async {
+    if (_pipPermissionPromptShown || !incomingIsVideo.value) return;
+    if (Get.isRegistered<GetStorage>() && Get.find<GetStorage>().read(_pipPromptShownKey) == true) {
+      return;
+    }
+    final pip = PipService();
+    if (!await pip.isSupported()) return;
+    if (await pip.isPermissionEnabled()) return;
+
+    _pipPermissionPromptShown = true;
+    if (Get.isRegistered<GetStorage>()) {
+      Get.find<GetStorage>().write(_pipPromptShownKey, true);
+    }
+    Get.snackbar(
+      'Enable Picture-in-Picture',
+      'Turn on Picture-in-Picture so this call keeps playing when you switch apps.',
+      snackPosition: SnackPosition.BOTTOM,
+      duration: const Duration(seconds: 6),
+      mainButton: TextButton(
+        onPressed: () => pip.openSettings(),
+        child: const Text('Open Settings', style: TextStyle(color: Colors.white)),
+      ),
+      backgroundColor: const Color(0xFF1E293B),
+      colorText: Colors.white,
+    );
+  }
+
   void _cleanupAndPop() {
     _cancelOngoingCallNotification();
     PushNotificationService().dismissCallNotification();
+    PipService().setCallActive(false);
     _callDurationTimer?.cancel();
     _callDurationTimer = null;
     callDurationSeconds.value = 0;

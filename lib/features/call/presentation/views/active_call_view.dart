@@ -13,6 +13,22 @@ class ActiveCallView extends StatelessWidget {
 
     return Obx(() {
       final isMinimized = lk.isMinimized.value;
+      final isInNativePip = lk.isInNativePip.value;
+
+      if (isInNativePip) {
+        // Real OS-level PiP window (Android): the whole Activity has been
+        // shrunk by the system, so render a chrome-free, full-bleed video
+        // view with no controls — there's no room/need for them here.
+        return Scaffold(
+          backgroundColor: const Color(0xFF0F172A),
+          body: Obx(() {
+            final track = lk.screenShareTrack.value ?? lk.remoteVideoTrack.value;
+            return track != null
+                ? VideoTrackRenderer(track)
+                : Container(color: const Color(0xFF0F172A));
+          }),
+        );
+      }
 
       return Scaffold(
         backgroundColor: isMinimized ? Colors.transparent : const Color(0xFF0F172A),

@@ -1,5 +1,148 @@
 package com.livepoised.app.livepoised_mobile
 
+import android.app.AppOpsManager
+import android.app.PendingIntent
+import android.app.PictureInPictureParams
+import android.app.RemoteAction
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.content.res.Configuration
+import android.graphics.drawable.Icon
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
+import android.util.Rational
 import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.MethodChannel
 
-class MainActivity : FlutterActivity()
+class MainActivity : FlutterActivity() {
+    private val channelName = "com.livepoised.app/pip"
+    private var methodChannel: MethodChannel? = null
+    private var isCallActive = false
+
+    private val actionEndCall = "com.livepoised.app.PIP_ACTION_END_CALL"
+    private var pipActionReceiver: BroadcastReceiver? = null
+
+    override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+        super.configureFlutterEngine(flutterEngine)
+        methodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, channelName)
+        methodChannel?.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "isPipSupported" -> result.success(isPipSupported())
+                "isPipPermissionEnabled" -> result.success(isPipPermissionEnabled())
+                "openPipSettings" -> {
+                    openPipSettings()
+                    result.success(null)
+                }
+                "setCallActive" -> {
+                    isCallActive = call.arguments as? Boolean ?: false
+                    result.success(null)
+                }
+                "enterPip" -> {
+                    result.success(enterPip())
+                }
+                else -> result.notImplemented()
+            }
+        }
+    }
+
+    override fun onCreate(savedInstanceState: android.os.Bundle?) {
+        super.onCreate(savedInstanceState)
+        pipActionReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                if (intent.action == actionEndCall) {
+                    methodChannel?.invokeMethod("onPipAction", "end_call")
+                }
+            }
+        }
+        val filter = IntentFilter(actionEndCall)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(pipActionReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(pipActionReceiver, filter)
+        }
+    }
+
+    override fun onDestroy() {
+        pipActionReceiver?.let {
+            try {
+                unregisterReceiver(it)
+            } catch (e: Exception) {
+                // already unregistered
+            }
+        }
+        super.onDestroy()
+    }
+
+    private fun isPipSupported(): Boolean {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+            packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_PICTURE_IN_PICTURE)
+    }
+
+    private fun isPipPermissionEnabled(): Boolean {
+        if (!isPipSupported()) return false
+        val appOps = getSystemService(APP_OPS_SERVICE) as AppOpsManager
+        val mode = appOps.checkOpNoThrow(
+            AppOpsManager.OPSTR_PICTURE_IN_PICTURE,
+            android.os.Process.myUid(),
+            packageName
+        )
+        return mode == AppOpsManager.MODE_ALLOWED
+    }
+
+    private fun openPipSettings() {
+        val intent = Intent("android.settings.PICTURE_IN_PICTURE_SETTINGS", Uri.parse("package:$packageName"))
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        try {
+            startActivity(intent)
+        } catch (e: Exception) {
+            startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
+        }
+    }
+
+    private fun buildPipActions(): ArrayList<RemoteAction> {
+        val pendingIntentFlags = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        val endCallIntent = PendingIntent.getBroadcast(
+            this,
+            1,
+            Intent(actionEndCall).setPackage(packageName),
+            pendingIntentFlags
+        )
+        val endCallAction = RemoteAction(
+            Icon.createWithResource(this, android.R.drawable.ic_menu_close_clear_cancel),
+            "End Call",
+            "End the call",
+            endCallIntent
+        )
+        return arrayListOf(endCallAction)
+    }
+
+    private fun enterPip(): Boolean {
+        if (!isPipSupported()) return false
+        return try {
+            val params = PictureInPictureParams.Builder()
+                .setAspectRatio(Rational(9, 16))
+                .setActions(buildPipActions())
+                .build()
+            enterPictureInPictureMode(params)
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (isCallActive && isPipSupported()) {
+            enterPip()
+        }
+    }
+
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        methodChannel?.invokeMethod("onPipModeChanged", isInPictureInPictureMode)
+    }
+}
