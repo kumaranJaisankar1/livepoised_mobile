@@ -16,18 +16,6 @@ import 'features/notification/presentation/controllers/notification_controller.d
 import 'firebase_options.dart';
 import 'routes/app_pages.dart';
 
-@pragma('vm:entry-point')
-Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  WidgetsFlutterBinding.ensureInitialized();
-  if (Firebase.apps.isEmpty) {
-    try {
-      await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform,
-      );
-    } catch (_) {}
-  }
-}
-
 Future<void> _initFirebaseAndPNS() async {
   try {
     if (Firebase.apps.isEmpty) {
@@ -47,7 +35,7 @@ Future<void> _initFirebaseAndPNS() async {
   }
 
   try {
-    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
   } catch (e) {
     debugPrint('Main: FirebaseMessaging handler error: $e');
   }

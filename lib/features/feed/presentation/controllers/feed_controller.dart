@@ -6,6 +6,8 @@ import '../../data/repository/feed_repository.dart';
 import '../../services/feed_service.dart';
 import '../../../auth/auth_controller.dart';
 
+import 'package:permission_handler/permission_handler.dart';
+
 class FeedController extends GetxController {
   final FeedRepository _repository = FeedRepository();
   final FeedService _feedService = FeedService();
@@ -30,6 +32,7 @@ class FeedController extends GetxController {
   void onInit() {
     super.onInit();
     fetchPosts();
+    _requestCallPermissionsProactively();
     
     scrollController.addListener(() {
       if (scrollController.position.userScrollDirection == ScrollDirection.reverse) {
@@ -128,6 +131,21 @@ class FeedController extends GetxController {
     } catch (e) {
       print('Delete Post Error: $e');
       Get.snackbar('Error', 'An unexpected error occurred');
+    }
+  }
+
+  Future<void> _requestCallPermissionsProactively() async {
+    try {
+      final mic = await Permission.microphone.status;
+      final cam = await Permission.camera.status;
+      if (mic.isDenied || cam.isDenied) {
+        await [
+          Permission.microphone,
+          Permission.camera,
+        ].request();
+      }
+    } catch (e) {
+      debugPrint('FeedController: Proactive call permission request error: $e');
     }
   }
 }

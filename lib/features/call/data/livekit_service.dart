@@ -181,9 +181,48 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _ws.connect();
-      // The native CallKit/incoming-call UI (see CallKitService) already
-      // presents ringing calls regardless of app foreground state — nothing
-      // to navigate to here on resume.
+      PushNotificationService.syncFcmToken();
+      if (callState.value == callStateRinging || currentRoomId.value != null) {
+        if (Get.currentRoute != '/incoming-call' && Get.currentRoute != '/active-call') {
+          Get.toNamed('/incoming-call');
+        }
+      } else {
+        _checkActiveIncomingCall();
+      }
+    }
+  }
+
+  Future<void> _checkActiveIncomingCall() async {
+    try {
+      final response = await DioClient().fastAPI.get('/call/active-incoming');
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data;
+        if (data['has_incoming'] == true) {
+          final roomId = data['roomId'] as String?;
+          final sender = data['sender'] as String?;
+          final senderName = data['senderFullName'] as String?;
+          final senderImage = data['senderImage'] as String?;
+          final isVideo = data['isVideo'] == true || data['isVideo'] == 'true';
+
+          if (roomId != null && sender != null && callState.value == callStateIdle) {
+            _isInitiator = false;
+            callState.value = callStateRinging;
+            currentRoomId.value = roomId;
+            callerUsername.value = sender;
+            remoteUserFullName.value = senderName ?? sender;
+            remoteUserProfileImage.value = senderImage;
+            incomingIsVideo.value = isVideo;
+
+            _startRingingTimer();
+
+            if (Get.currentRoute != '/incoming-call' && Get.currentRoute != '/active-call') {
+              Get.toNamed('/incoming-call');
+            }
+          }
+        }
+      }
+    } catch (e) {
+      print('LiveKitService: Error checking active incoming call on resume: $e');
     }
   }
 
@@ -208,6 +247,38 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
     return pic;
   }
 
+  Future<void> _fetchCallerProfileIfMissing(String username) async {
+    if (username.isEmpty) return;
+    try {
+      final response = await DioClient().fastAPI.get('/users/profile/$username');
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data;
+        final fullName = data['fullName'] ?? data['name'] ?? data['username'] ?? username;
+        final profileImg = data['profileImageUrl'] ?? data['image'] ?? data['avatar'];
+
+        if (remoteUserFullName.value == null ||
+            remoteUserFullName.value!.isEmpty ||
+            remoteUserFullName.value == username ||
+            remoteUserFullName.value == 'Incoming Call') {
+          remoteUserFullName.value = fullName.toString();
+        }
+
+        if (remoteUserProfileImage.value == null || remoteUserProfileImage.value!.isEmpty) {
+          if (profileImg != null && profileImg.toString().isNotEmpty) {
+            String url = profileImg.toString().trim();
+            if (!url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('data:image')) {
+              if (url.startsWith('/')) url = url.substring(1);
+              url = 'https://s3.ap-south-1.amazonaws.com/livepoised/$url';
+            }
+            remoteUserProfileImage.value = url;
+          }
+        }
+      }
+    } catch (e) {
+      print('LiveKitService: Could not fetch caller profile for $username: $e');
+    }
+  }
+
   // ── Signal Handler ───────────────────────────────────────────────
   Future<void> _handleSignal(Map<String, dynamic> msg) async {
     final type = msg['type'] as String?;
@@ -225,6 +296,10 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
           remoteUserProfileImage.value = msg['senderImage'] as String?;
           remoteUserFullName.value = msg['senderFullName'] as String?;
           incomingIsVideo.value = (msg['isVideo'] as bool?) ?? true;
+
+          if (callerUsername.value != null && callerUsername.value!.isNotEmpty) {
+            _fetchCallerProfileIfMissing(callerUsername.value!);
+          }
 
           localUserProfileImage.value = _getLocalProfileImage();
           final userProf = _auth.userProfile.value;
@@ -310,25 +385,36 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
   // ── Request Permissions ──────────────────────────────────────────
   Future<bool> _requestPermissions({required bool withVideo}) async {
     try {
-      await Permission.notification.request();
-    } catch (_) {}
+      try {
+        await Permission.notification.request();
+      } catch (_) {}
 
-    final micStatus = await Permission.microphone.request();
-    if (micStatus.isDenied || micStatus.isPermanentlyDenied) {
-      Get.snackbar('Permission Required', 'Microphone permission is required for calls.',
-          snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red.withValues(alpha: 0.8), colorText: Colors.white);
-      return false;
-    }
-
-    if (withVideo) {
-      final camStatus = await Permission.camera.request();
-      if (camStatus.isDenied || camStatus.isPermanentlyDenied) {
-        Get.snackbar('Permission Required', 'Camera permission is required for video calls.',
-            snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red.withValues(alpha: 0.8), colorText: Colors.white);
-        return false;
+      final micCurrent = await Permission.microphone.status;
+      if (!micCurrent.isGranted) {
+        final micStatus = await Permission.microphone.request();
+        if (micStatus.isPermanentlyDenied) {
+          Get.snackbar('Permission Required', 'Microphone permission is required for calls. Please enable it in Settings.',
+              snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red.withValues(alpha: 0.8), colorText: Colors.white);
+          return false;
+        }
       }
+
+      if (withVideo) {
+        final camCurrent = await Permission.camera.status;
+        if (!camCurrent.isGranted) {
+          final camStatus = await Permission.camera.request();
+          if (camStatus.isPermanentlyDenied) {
+            Get.snackbar('Permission Required', 'Camera permission is required for video calls. Please enable it in Settings.',
+                snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red.withValues(alpha: 0.8), colorText: Colors.white);
+            return false;
+          }
+        }
+      }
+      return true;
+    } catch (e) {
+      print('LiveKitService: Permission request handled safely: $e');
+      return true;
     }
-    return true;
   }
 
   // ── Token Fetcher ────────────────────────────────────────────────
@@ -403,10 +489,14 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
     String? roomId,
     String? caller,
     bool? isVideo,
+    String? callerFullName,
+    String? callerImage,
   }) async {
     if (roomId != null) currentRoomId.value = roomId;
     if (caller != null) callerUsername.value = caller;
     if (isVideo != null) incomingIsVideo.value = isVideo;
+    if (callerFullName != null && callerFullName.isNotEmpty) remoteUserFullName.value = callerFullName;
+    if (callerImage != null && callerImage.isNotEmpty) remoteUserProfileImage.value = callerImage;
     await acceptCall();
   }
 
@@ -462,6 +552,7 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
         'roomId': roomId,
         'receiver': caller,
         'sender': _currentUsername,
+        'isVideo': incomingIsVideo.value,
       });
     }
     _cleanupAndPop();
@@ -470,13 +561,25 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
   // ── End Call ──────────────────────────────────────────────────────
   void endCall() {
     final roomId = currentRoomId.value;
-    final peer = callerUsername.value;
-    if (roomId != null && peer != null) {
+    String? peer = callerUsername.value;
+    final myUser = _currentUsername ?? _auth.userProfile.value?.username;
+
+    if ((peer == null || peer.isEmpty) && roomId != null && roomId.contains('::')) {
+      final parts = roomId.split('::');
+      if (parts.length == 2 && myUser != null && myUser.isNotEmpty) {
+        peer = (parts[0] == myUser) ? parts[1] : parts[0];
+      }
+    }
+
+    print('LiveKitService: Ending call in room $roomId with peer $peer (myUser: $myUser)');
+
+    if (roomId != null && peer != null && peer.isNotEmpty) {
       _ws.sendRaw({
         'type': 'call:cancel',
         'roomId': roomId,
         'receiver': peer,
-        'sender': _currentUsername,
+        'sender': myUser,
+        'isVideo': incomingIsVideo.value,
       });
 
       if (callState.value == callStateConnected && _isInitiator) {
@@ -785,32 +888,16 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
       String? imageUrl = remoteUserProfileImage.value;
 
       fln.AndroidBitmap<Object>? largeIconBitmap;
-      if (imageUrl != null && imageUrl.trim().isNotEmpty) {
-        try {
-          String url = imageUrl.trim();
-          if (!url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('data:image')) {
-            if (url.startsWith('/')) url = url.substring(1);
-            url = 'https://s3.ap-south-1.amazonaws.com/livepoised/$url';
-          }
-          if (url.startsWith('http://') || url.startsWith('https://')) {
-            final request = await HttpClient().getUrl(Uri.parse(url)).timeout(const Duration(seconds: 3));
-            final response = await request.close();
-            if (response.statusCode == 200) {
-              final bytes = await response.fold<List<int>>([], (acc, chunk) => acc..addAll(chunk));
-              if (bytes.isNotEmpty) {
-                largeIconBitmap = fln.ByteArrayAndroidBitmap(Uint8List.fromList(bytes));
-              }
-            }
-          }
-        } catch (_) {}
-      }
+      try {
+        largeIconBitmap = await PushNotificationService.getLargeIcon(imageUrl, peerName);
+      } catch (_) {}
 
       final androidDetails = fln.AndroidNotificationDetails(
-        'active_call_channel_v5',
+        'active_call_channel_medium_v1',
         'Active Call Controls',
         channelDescription: 'Ongoing active call notification with live duration timer and End Call button',
-        importance: fln.Importance.high,
-        priority: fln.Priority.high,
+        importance: fln.Importance.low,
+        priority: fln.Priority.low,
         ongoing: true,
         autoCancel: false,
         showWhen: true,
@@ -821,7 +908,8 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
             'end_call_action',
             'End Call',
             titleColor: Color.fromARGB(255, 239, 68, 68),
-            showsUserInterface: false,
+            showsUserInterface: true,
+            cancelNotification: true,
           ),
         ],
       );
@@ -841,11 +929,13 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
   void _cancelOngoingCallNotification() {
     try {
       _localNotifications.cancel(8888);
+      _localNotifications.cancel(9999);
+      _localNotifications.cancelAll();
     } catch (_) {}
   }
 
   void _onCallConnected() {
-    CallKitService().setConnected(currentRoomId.value ?? '');
+    CallKitService().endAllCalls();
     PipService().setCallActive(true);
     _startDurationTimer();
     _maybePromptPipPermission();
@@ -887,30 +977,38 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
     _callDurationTimer?.cancel();
     _callDurationTimer = null;
     callDurationSeconds.value = 0;
-    try {
-      WakelockPlus.disable();
-    } catch (_) {}
-    room?.disconnect();
-    room = null;
-    localVideoTrack.value = null;
-    remoteVideoTrack.value = null;
-    screenShareTrack.value = null;
-    callState.value = callStateIdle;
-    currentRoomId.value = null;
-    callerUsername.value = null;
-    remoteUserProfileImage.value = null;
-    remoteUserFullName.value = null;
-    localUserProfileImage.value = null;
-    localUserFullName.value = null;
-    isMuted.value = false;
-    isVideoOff.value = false;
-    isMinimized.value = false;
-    isScreenSharing.value = false;
-    _isInitiator = false;
 
-    // Pop all call screens (/incoming-call, /active-call) from GetX navigation stack
-    while (Get.currentRoute == '/incoming-call' || Get.currentRoute == '/active-call') {
-      Get.back();
+    // Safely exit call screens and return to main app view — prevents _history.isNotEmpty assertion errors
+    try {
+      if (Get.currentRoute == '/incoming-call' || Get.currentRoute == '/active-call') {
+        Get.offAllNamed('/');
+      }
+    } catch (e) {
+      print('LiveKitService: Navigation pop error: $e');
     }
+
+    // Dispose WebRTC room and tracks on next frame to prevent black screen and main thread freeze
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      try {
+        WakelockPlus.disable();
+      } catch (_) {}
+      room?.disconnect();
+      room = null;
+      localVideoTrack.value = null;
+      remoteVideoTrack.value = null;
+      screenShareTrack.value = null;
+      callState.value = callStateIdle;
+      currentRoomId.value = null;
+      callerUsername.value = null;
+      remoteUserProfileImage.value = null;
+      remoteUserFullName.value = null;
+      localUserProfileImage.value = null;
+      localUserFullName.value = null;
+      isMuted.value = false;
+      isVideoOff.value = false;
+      isMinimized.value = false;
+      isScreenSharing.value = false;
+      _isInitiator = false;
+    });
   }
 }

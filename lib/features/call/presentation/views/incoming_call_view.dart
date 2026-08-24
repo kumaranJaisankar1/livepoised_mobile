@@ -6,6 +6,18 @@ import '../../data/livekit_service.dart';
 class IncomingCallView extends StatelessWidget {
   const IncomingCallView({super.key});
 
+  String _formatName(String? raw) {
+    if (raw == null || raw.trim().isEmpty || raw == 'Incoming Call') return 'Incoming Call';
+    final name = raw.trim();
+    if (name.contains(' ')) {
+      return name.split(' ').map((w) => w.isNotEmpty ? '${w[0].toUpperCase()}${w.substring(1)}' : '').join(' ');
+    }
+    if (name.contains('.')) {
+      return name.split('.').map((w) => w.isNotEmpty ? '${w[0].toUpperCase()}${w.substring(1)}' : '').join(' ');
+    }
+    return '${name[0].toUpperCase()}${name.substring(1)}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final LiveKitService lk = Get.find<LiveKitService>();
@@ -14,7 +26,8 @@ class IncomingCallView extends StatelessWidget {
       backgroundColor: const Color(0xFF0F172A),
       body: SafeArea(
         child: Obx(() {
-          final callerName = lk.remoteUserFullName.value ?? lk.callerUsername.value ?? 'Incoming Call';
+          final rawName = lk.remoteUserFullName.value ?? lk.callerUsername.value;
+          final callerName = _formatName(rawName);
           final callerPic = lk.remoteUserProfileImage.value;
           final isVideo = lk.incomingIsVideo.value;
 

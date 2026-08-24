@@ -188,6 +188,8 @@ class CallKitService {
       roomId: extra['roomId'] as String?,
       caller: extra['sender'] as String?,
       isVideo: extra['isVideo'] == true || extra['isVideo'] == 'true',
+      callerFullName: extra['senderFullName'] as String?,
+      callerImage: extra['senderImage'] as String?,
     );
   }
 
@@ -205,7 +207,9 @@ class CallKitService {
     if (_isProgrammaticDismissal) return;
     if (Get.isRegistered<LiveKitService>()) {
       final lk = Get.find<LiveKitService>();
-      if (lk.callState.value != callStateIdle) {
+      // Only trigger endCall if the call was still in ringing or calling state —
+      // do NOT terminate an already connected call when native CallKit UI dismisses!
+      if (lk.callState.value == callStateRinging || lk.callState.value == callStateCalling) {
         lk.endCall();
       }
     }
@@ -238,13 +242,17 @@ String stringToUuid(String input) {
     String? senderImage,
   }) async {
     final String uuid = stringToUuid(id.isNotEmpty ? id : roomId);
-    final String? safeAvatar = (senderImage != null && !senderImage.startsWith('data:image')) ? senderImage : null;
+    String? safeAvatar;
+    if (senderImage != null && senderImage.trim().isNotEmpty && !senderImage.startsWith('data:image')) {
+      safeAvatar = await _downloadAndCacheAvatar(senderImage, uuid);
+    }
+
     final params = CallKitParams(
       id: uuid,
       nameCaller: senderFullName.isNotEmpty ? senderFullName : sender,
       appName: 'Live Poised',
       avatar: safeAvatar,
-      handle: senderFullName.isNotEmpty ? senderFullName : sender,
+      handle: isVideo ? 'Incoming Video Call' : 'Incoming Voice Call',
       type: isVideo ? 1 : 0,
       duration: 30000,
       extra: {
@@ -314,5 +322,30 @@ String stringToUuid(String input) {
         _isProgrammaticDismissal = false;
       });
     }
+  }
+
+  static Future<String?> _downloadAndCacheAvatar(String imageUrl, String uuid) async {
+    try {
+      String url = imageUrl.trim();
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        if (url.startsWith('/')) url = url.substring(1);
+        url = 'https://s3.ap-south-1.amazonaws.com/livepoised/$url';
+      }
+
+      final request = await HttpClient().getUrl(Uri.parse(url)).timeout(const Duration(seconds: 3));
+      final response = await request.close();
+      if (response.statusCode == 200) {
+        final bytes = await response.fold<List<int>>([], (acc, chunk) => acc..addAll(chunk));
+        if (bytes.isNotEmpty) {
+          final tempDir = Directory.systemTemp;
+          final file = File('${tempDir.path}/call_avatar_$uuid.png');
+          await file.writeAsBytes(bytes);
+          return file.path;
+        }
+      }
+    } catch (e) {
+      print('CallKitService: Error downloading avatar for CallKit: $e');
+    }
+    return imageUrl;
   }
 }

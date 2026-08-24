@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:get_storage/get_storage.dart';
 import '../../../auth/auth_controller.dart';
 import '../../data/datasource/chat_service.dart';
+import '../../data/datasource/chat_websocket_service.dart';
 import '../../data/models/inbox_item.dart';
 
 class ChatListController extends GetxController {
@@ -13,6 +16,8 @@ class ChatListController extends GetxController {
   final isSearchActive = false.obs;
   final searchQuery = ''.obs;
   final searchTextController = TextEditingController();
+  StreamSubscription? _wsSub;
+  Worker? _profileWorker;
 
   List<InboxItem> get filteredInboxItems {
     if (searchQuery.value.isEmpty) {
@@ -52,6 +57,8 @@ class ChatListController extends GetxController {
 
   @override
   void onClose() {
+    _wsSub?.cancel();
+    _profileWorker?.dispose();
     searchTextController.dispose();
     super.onClose();
   }
@@ -60,11 +67,31 @@ class ChatListController extends GetxController {
   void onInit() {
     super.onInit();
     fetchInbox();
+
+    _profileWorker = ever(_authController.userProfile, (_) {
+      fetchInbox();
+    });
+
+    if (Get.isRegistered<ChatWebSocketService>()) {
+      _wsSub = Get.find<ChatWebSocketService>().messages.listen((_) {
+        fetchInbox();
+      });
+    }
   }
 
   Future<void> fetchInbox() async {
-    final username = _authController.userProfile.value?.username;
-    if (username == null) return;
+    String? username = _authController.userProfile.value?.username;
+    if (username == null || username.isEmpty) {
+      if (Get.isRegistered<GetStorage>()) {
+        final box = Get.find<GetStorage>();
+        username = box.read('username') ?? box.read('user_username') ?? box.read('user')?['username'];
+      }
+    }
+    if (username == null || username.isEmpty) {
+      await Future.delayed(const Duration(milliseconds: 500));
+      username = _authController.userProfile.value?.username;
+    }
+    if (username == null || username.isEmpty) return;
 
     isLoading.value = true;
     try {

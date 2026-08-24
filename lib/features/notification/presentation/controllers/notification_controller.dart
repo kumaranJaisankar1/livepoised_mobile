@@ -167,6 +167,30 @@ class NotificationController extends GetxController {
     }
   }
 
+  Future<void> markNotificationsAsReadForUser(String username) async {
+    if (username.isEmpty) return;
+    try {
+      final unreadForUser = notifications.where(
+        (n) => !n.read && (
+          (n.senderUsername != null && n.senderUsername!.toLowerCase() == username.toLowerCase()) ||
+          n.message.toLowerCase().contains(username.toLowerCase())
+        )
+      ).map((n) => n.id).toList();
+
+      if (unreadForUser.isNotEmpty) {
+        await _service.markAllAsRead(unreadForUser);
+        for (var i = 0; i < notifications.length; i++) {
+          if (unreadForUser.contains(notifications[i].id)) {
+            notifications[i] = notifications[i].copyWith(read: true);
+          }
+        }
+        unreadCount.value = notifications.where((n) => !n.read).length;
+      }
+    } catch (e) {
+      print('Error marking notifications as read for user $username: $e');
+    }
+  }
+
   void handleNotificationTap(NotificationModel notification) {
     if (!notification.read) {
       markAsRead(notification.id);

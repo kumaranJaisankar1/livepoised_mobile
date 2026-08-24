@@ -7,6 +7,8 @@ import '../../data/datasource/chat_websocket_service.dart';
 import '../../data/models/chat_message.dart';
 import '../../data/models/chat_connection.dart';
 import '../../data/models/inbox_item.dart';
+import '../../../../core/services/push_notification_service.dart';
+import '../../../notification/presentation/controllers/notification_controller.dart';
 import 'chat_list_controller.dart';
 
 class ChatController extends GetxController {
@@ -61,8 +63,12 @@ class ChatController extends GetxController {
     }
 
     final String? otherUser = otherUsername;
-    if (otherUser != null) {
+    if (otherUser != null && otherUser.isNotEmpty) {
       fetchHistory(otherUser);
+      PushNotificationService.clearNotificationsForUser(otherUser);
+      if (Get.isRegistered<NotificationController>()) {
+        Get.find<NotificationController>().markNotificationsAsReadForUser(otherUser);
+      }
     }
 
     _wsService.messages.listen(onIncomingMessage);

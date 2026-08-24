@@ -6,8 +6,15 @@ import '../../../../core/utils/image_utils.dart';
 import '../controllers/chat_list_controller.dart';
 import '../../data/models/inbox_item.dart';
 
-class ConversationListView extends GetView<ChatListController> {
+class ConversationListView extends StatelessWidget {
   const ConversationListView({super.key});
+
+  ChatListController get controller {
+    if (!Get.isRegistered<ChatListController>()) {
+      return Get.put(ChatListController(), permanent: true);
+    }
+    return Get.find<ChatListController>();
+  }
 
   @override
   Widget build(BuildContext context) {

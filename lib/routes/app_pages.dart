@@ -67,7 +67,9 @@ class AppPages {
         if (!Get.isRegistered<ProfileController>()) {
           Get.lazyPut(() => ProfileController(), fenix: true);
         }
-        Get.lazyPut(() => ChatListController());
+        if (!Get.isRegistered<ChatListController>()) {
+          Get.lazyPut(() => ChatListController(), fenix: true);
+        }
         Get.lazyPut(() => NeuroWellnessController());
       }),
     ),

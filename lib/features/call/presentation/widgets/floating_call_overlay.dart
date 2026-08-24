@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:livekit_client/livekit_client.dart';
 import '../../data/livekit_service.dart';
 
 class FloatingCallOverlay extends StatelessWidget {
@@ -13,116 +12,135 @@ class FloatingCallOverlay extends StatelessWidget {
 
     return Obx(() {
       final isConnected = lk.callState.value == callStateConnected;
-      final isMinimized = lk.isMinimized.value;
+      final currentRoute = Get.currentRoute;
+      final isMinimized = lk.isMinimized.value || (isConnected && currentRoute != '/active-call');
 
       if (!isConnected || !isMinimized) {
         return const SizedBox.shrink();
       }
 
       final remoteName = lk.remoteUserFullName.value ?? lk.callerUsername.value ?? 'Call';
-      final hasRemoteVideo = lk.remoteVideoTrack.value != null;
+      final isVideo = lk.incomingIsVideo.value;
+      final topPadding = MediaQuery.of(context).padding.top;
 
       return Positioned(
-        right: 16,
-        bottom: 80,
+        top: 0,
+        left: 0,
+        right: 0,
         child: Material(
           type: MaterialType.transparency,
-          child: Container(
-            width: 200,
-            height: 140,
-            decoration: BoxDecoration(
-              color: const Color(0xFF1E293B),
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.6),
-                  blurRadius: 16,
-                  spreadRadius: 2,
+          child: GestureDetector(
+            onTap: () {
+              lk.isMinimized.value = false;
+              if (Get.currentRoute != '/active-call') {
+                Get.toNamed('/active-call');
+              }
+            },
+            child: Container(
+              padding: EdgeInsets.only(
+                top: topPadding + 6,
+                bottom: 10,
+                left: 16,
+                right: 16,
+              ),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF065F46), Color(0xFF0F766E)],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
                 ),
-              ],
-              border: Border.all(color: Colors.tealAccent, width: 1.5),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: Stack(
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.3),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Row(
                 children: [
-                  if (hasRemoteVideo)
-                    Positioned.fill(
-                      child: VideoTrackRenderer(lk.remoteVideoTrack.value!),
-                    )
-                  else
-                    Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            remoteName,
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
-                          ),
-                          const SizedBox(height: 4),
-                          Obx(() => Text(
-                                lk.formattedCallDuration,
-                                style: const TextStyle(color: Colors.tealAccent, fontSize: 12, fontWeight: FontWeight.w600),
-                              )),
-                        ],
-                      ),
+                  // Animated / Pulsing Phone Icon
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      shape: BoxShape.circle,
                     ),
+                    child: Icon(
+                      isVideo ? Icons.videocam : Icons.call,
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
 
-                  // Top Action (Expand to Full Screen)
-                  Positioned(
-                    top: 6,
-                    right: 6,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.6),
-                        shape: BoxShape.circle,
-                      ),
-                      child: IconButton(
-                        icon: const Icon(Icons.aspect_ratio, color: Colors.white, size: 16),
-                        onPressed: () => lk.toggleMinimize(),
-                        constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
-                        padding: EdgeInsets.zero,
-                      ),
+                  // Call Info (Name & Live Timer)
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          remoteName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Obx(() => Text(
+                              'Tap to return • ${lk.formattedCallDuration}',
+                              style: const TextStyle(
+                                color: Color(0xFFA7F3D0),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            )),
+                      ],
                     ),
                   ),
 
-                  // Bottom Call Controls (Mute & End Call)
-                  Positioned(
-                    bottom: 6,
-                    left: 6,
-                    right: 6,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.6),
-                            shape: BoxShape.circle,
-                          ),
-                          child: IconButton(
-                            icon: Icon(
-                              lk.isMuted.value ? Icons.mic_off : Icons.mic,
-                              color: lk.isMuted.value ? Colors.redAccent : Colors.white,
-                              size: 16,
+                  // Mute Button
+                  Obx(() => IconButton(
+                        icon: Icon(
+                          lk.isMuted.value ? Icons.mic_off : Icons.mic,
+                          color: lk.isMuted.value ? Colors.redAccent : Colors.white,
+                          size: 20,
+                        ),
+                        onPressed: () => lk.toggleMute(),
+                        constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                        padding: EdgeInsets.zero,
+                      )),
+
+                  const SizedBox(width: 8),
+
+                  // End Call Button
+                  GestureDetector(
+                    onTap: () => lk.endCall(),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.redAccent,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.call_end, color: Colors.white, size: 16),
+                          SizedBox(width: 4),
+                          Text(
+                            'End',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
                             ),
-                            onPressed: () => lk.toggleMute(),
-                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                            padding: EdgeInsets.zero,
                           ),
-                        ),
-                        Container(
-                          decoration: const BoxDecoration(
-                            color: Colors.redAccent,
-                            shape: BoxShape.circle,
-                          ),
-                          child: IconButton(
-                            icon: const Icon(Icons.call_end, color: Colors.white, size: 16),
-                            onPressed: () => lk.endCall(),
-                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                            padding: EdgeInsets.zero,
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ],

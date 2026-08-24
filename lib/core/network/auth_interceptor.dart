@@ -26,7 +26,7 @@ class AuthInterceptor extends Interceptor {
       if (!_isRefreshing) {
         _isRefreshing = true;
         try {
-          final authService = Get.find<AuthService>();
+          final authService = Get.isRegistered<AuthService>() ? Get.find<AuthService>() : AuthService();
           final success = await authService.refreshToken();
           
           if (success) {
@@ -37,14 +37,17 @@ class AuthInterceptor extends Interceptor {
             final options = err.requestOptions;
             options.headers['Authorization'] = 'Bearer $newToken';
             
-            // Create a new Dio instance to retry (avoiding the interceptor loop if possible, 
-            // but standard Dio.fetch works if we update headers correctly)
+            // Create a new Dio instance to retry
             final dio = Dio(); 
             final response = await dio.fetch(options);
             return handler.resolve(response);
           } else {
             // Refresh failed, logout user
-            Get.find<AuthService>().logout();
+            if (Get.isRegistered<AuthService>()) {
+              Get.find<AuthService>().logout();
+            } else {
+              AuthService().logout();
+            }
             Get.offAllNamed('/login'); // Redirect to login
           }
         } catch (e) {

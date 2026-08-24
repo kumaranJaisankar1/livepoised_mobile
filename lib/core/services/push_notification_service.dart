@@ -8,12 +8,76 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:get_storage/get_storage.dart';
 import '../../features/call/data/livekit_service.dart';
 import '../../features/notification/data/services/notification_service.dart';
+import '../../features/chat/data/models/inbox_item.dart';
+import '../../features/chat/presentation/controllers/chat_controller.dart';
 import 'callkit_service.dart';
 
 @pragma('vm:entry-point')
-Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+Future<void> notificationTapBackground(NotificationResponse response) async {
+  if (response.actionId == 'end_call_action') {
+    try {
+      final localNotifications = FlutterLocalNotificationsPlugin();
+      await localNotifications.cancel(8888);
+      await localNotifications.cancel(9999);
+    } catch (_) {}
+    await CallKitService().endAllCalls();
+    if (Get.isRegistered<LiveKitService>()) {
+      Get.find<LiveKitService>().endCall();
+    } else {
+      await GetStorage.init();
+      await GetStorage().write('pending_call_action', {'action': 'end'});
+    }
+    return;
+  } else if (response.actionId == 'call_back') {
+    if (response.payload != null) {
+      try {
+        final Map<String, dynamic> data = jsonDecode(response.payload!);
+        final sender = data['sender'] as String?;
+        final isVideo = data['isVideo'] == 'true' || data['isVideo'] == true;
+        if (sender != null && sender.isNotEmpty) {
+          if (Get.isRegistered<LiveKitService>()) {
+            Get.find<LiveKitService>().startCall(sender, withVideo: isVideo);
+          } else {
+            await GetStorage.init();
+            final box = GetStorage();
+            await box.write('pending_call_action', {
+              'action': 'start',
+              'targetUsername': sender,
+              'isVideo': isVideo,
+              'senderFullName': data['senderFullName'],
+              'senderImage': data['senderImage'],
+            });
+          }
+        }
+      } catch (e) {
+        print('PNS Error in background notification tap: $e');
+      }
+    }
+  } else if (response.payload != null) {
+    try {
+      final Map<String, dynamic> data = jsonDecode(response.payload!);
+      final sender = (data['sender'] ?? data['senderUsername'] ?? data['otherUsername'] ?? data['referenceId'])?.toString();
+      if (sender != null && sender.isNotEmpty) {
+        await GetStorage.init();
+        final box = GetStorage();
+        await box.write('pending_call_action', {
+          'action': 'open_chat',
+          'targetUsername': sender,
+          'senderFullName': data['senderFullName'],
+          'senderImage': data['senderImage'],
+        });
+      }
+    } catch (e) {
+      print('PNS Error in background chat notification tap: $e');
+    }
+  }
+}
+
+@pragma('vm:entry-point')
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   print("PNS: Handling background FCM message: ${message.messageId}, type: ${message.data['type']}");
   WidgetsFlutterBinding.ensureInitialized();
   if (Firebase.apps.isEmpty) {
@@ -32,10 +96,18 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       type == 'MISSED_CALL' ||
       content.contains('Missed') ||
       content.contains('Call ended')) {
+    final localNotifications = FlutterLocalNotificationsPlugin();
+    try {
+      await localNotifications.cancel(8888);
+      await localNotifications.cancel(9999);
+      await localNotifications.cancelAll();
+    } catch (_) {}
+
     final roomId = message.data['roomId']?.toString();
     if (roomId != null && roomId.isNotEmpty) {
       await CallKitService().endIncomingCall(roomId);
     }
+    await CallKitService().endAllCalls();
 
     if (type == 'CALL_CANCELLED' || type == 'call:cancel' || type == 'MISSED_CALL' || content.contains('Missed')) {
       PushNotificationService.showMissedCallNotification(message.data);
@@ -45,14 +117,30 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
   if (type == 'INCOMING_CALL' || type == 'call:incoming') {
     final roomId = message.data['roomId']?.toString() ?? '';
+    String? senderImage = message.data['senderImage']?.toString();
+    if (senderImage != null && senderImage.trim().isNotEmpty && !senderImage.startsWith('data:image')) {
+      String url = senderImage.trim();
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        if (url.startsWith('/')) url = url.substring(1);
+        url = 'https://s3.ap-south-1.amazonaws.com/livepoised/$url';
+      }
+      senderImage = url;
+    }
+
     await CallKitService().showIncomingCall(
       id: roomId,
       roomId: roomId,
       sender: message.data['sender']?.toString() ?? '',
       senderFullName: message.data['senderFullName']?.toString() ?? message.data['sender']?.toString() ?? 'Incoming Call',
       isVideo: message.data['isVideo'] == 'true' || message.data['isVideo'] == true,
-      senderImage: message.data['senderImage']?.toString(),
+      senderImage: senderImage,
     );
+    return;
+  }
+
+  if (type == 'CHAT_MESSAGE' || type == 'CHAT') {
+    PushNotificationService.showMessageNotification(message.data);
+    return;
   }
 }
 
@@ -64,7 +152,7 @@ class PushNotificationService {
   FirebaseMessaging get _fcm => FirebaseMessaging.instance;
   final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
 
-  static Future<ByteArrayAndroidBitmap?> _getLargeIcon(String? imageUrl, String senderName) async {
+  static Future<ByteArrayAndroidBitmap?> getLargeIcon(String? imageUrl, String senderName) async {
     if (imageUrl != null && imageUrl.trim().isNotEmpty) {
       try {
         String url = imageUrl.trim();
@@ -109,13 +197,23 @@ class PushNotificationService {
         ..style = PaintingStyle.fill;
       canvas.drawCircle(const Offset(96, 96), 96, paint);
 
-      final initial = name.trim().isNotEmpty ? name.trim()[0].toUpperCase() : 'C';
+      final cleanName = name.trim();
+      String initials = '?';
+      if (cleanName.isNotEmpty) {
+        final parts = cleanName.split(RegExp(r'[\s._]+')).where((p) => p.isNotEmpty).toList();
+        if (parts.length >= 2) {
+          initials = '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+        } else {
+          initials = cleanName.substring(0, cleanName.length >= 2 ? 2 : 1).toUpperCase();
+        }
+      }
+
       final textPainter = TextPainter(
         text: TextSpan(
-          text: initial,
-          style: const TextStyle(
+          text: initials,
+          style: TextStyle(
             color: Colors.white,
-            fontSize: 96,
+            fontSize: initials.length > 1 ? 72 : 96,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -184,22 +282,30 @@ class PushNotificationService {
     final String senderFullName = data['senderFullName'] ?? data['sender'] ?? 'User';
     final bool isVideo = data['isVideo'] == 'true' || data['isVideo'] == true;
     final String sender = data['sender'] ?? '';
+    final String? senderImage = data['senderImage'];
+
+    AndroidBitmap<Object>? largeIconBitmap;
+    try {
+      largeIconBitmap = await getLargeIcon(senderImage, senderFullName);
+    } catch (_) {}
 
     final payload = jsonEncode({
       'type': 'MISSED_CALL',
       'sender': sender,
       'senderFullName': senderFullName,
       'isVideo': isVideo,
+      'senderImage': senderImage,
     });
 
-    const androidDetails = AndroidNotificationDetails(
+    final androidDetails = AndroidNotificationDetails(
       'missed_call_channel',
       'Missed Call Notifications',
       channelDescription: 'Notifications for missed incoming voice and video calls',
       importance: Importance.high,
       priority: Priority.high,
       category: AndroidNotificationCategory.missedCall,
-      actions: [
+      largeIcon: largeIconBitmap,
+      actions: const [
         AndroidNotificationAction(
           'call_back',
           'Call Back',
@@ -214,7 +320,7 @@ class PushNotificationService {
       7777,
       'Missed Call',
       'Missed ${isVideo ? "video" : "voice"} call from $senderFullName',
-      const NotificationDetails(android: androidDetails),
+      NotificationDetails(android: androidDetails),
       payload: payload,
     );
   }
@@ -228,7 +334,7 @@ class PushNotificationService {
     
     // Register background handler
     try {
-      FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+      FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
     } catch (e) {
       print('PNS Warning: Could not register onBackgroundMessage: $e');
     }
@@ -286,9 +392,18 @@ class PushNotificationService {
         initSettings,
         onDidReceiveNotificationResponse: (NotificationResponse response) {
           if (response.actionId == 'end_call_action') {
+            try {
+              final localNotifications = FlutterLocalNotificationsPlugin();
+              localNotifications.cancel(8888);
+              localNotifications.cancel(9999);
+            } catch (_) {}
+            CallKitService().endAllCalls();
             if (Get.isRegistered<LiveKitService>()) {
               Get.find<LiveKitService>().endCall();
+            } else {
+              GetStorage().write('pending_call_action', {'action': 'end'});
             }
+            return;
           } else if (response.actionId == 'call_back') {
             if (response.payload != null) {
               try {
@@ -307,6 +422,7 @@ class PushNotificationService {
             } catch (_) {}
           }
         },
+        onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
       );
     } catch (e) {
       print('PNS Warning: Local notifications initialize error: $e');
@@ -335,6 +451,11 @@ class PushNotificationService {
           return;
         }
 
+        if (type == 'CHAT_MESSAGE' || type == 'CHAT' || type == 'chat') {
+          showMessageNotification(message.data);
+          return;
+        }
+
         if (type == 'INCOMING_CALL' || type == 'call:incoming') {
           // No-op here: while the app is alive/foregrounded, the live
           // ChatWebSocketService already delivers this same signal to
@@ -344,6 +465,14 @@ class PushNotificationService {
           return;
         } else if (notification != null) {
           _showLocalNotification(notification, message.data);
+        } else if (content.isNotEmpty) {
+          _showLocalNotification(
+            RemoteNotification(
+              title: message.data['title']?.toString() ?? message.data['senderFullName']?.toString() ?? 'LivePoised',
+              body: content,
+            ),
+            message.data,
+          );
         }
       });
 
@@ -380,7 +509,7 @@ class PushNotificationService {
     const initSettings = InitializationSettings(android: androidSettings);
     await _localNotifications.initialize(initSettings);
 
-    final largeIcon = await _getLargeIcon(senderImage, senderFullName);
+    final largeIcon = await getLargeIcon(senderImage, senderFullName);
 
     final androidDetails = AndroidNotificationDetails(
       'incoming_call_v3_channel',
@@ -464,13 +593,11 @@ class PushNotificationService {
     );
   }
 
-  void handleNavigation(Map<String, dynamic> data) {
+  static void handleNavigation(Map<String, dynamic> data) {
     final String? type = data['type'];
     final dynamic referenceId = data['referenceId'];
 
-    print('Directing navigation for type: $type, data: $data');
-
-    if (type == null) return;
+    print('PNS: Navigating for notification type: $type, data: $data');
 
     switch (type) {
       case 'INCOMING_CALL':
@@ -478,8 +605,8 @@ class PushNotificationService {
         final roomId = data['roomId'] as String?;
         final sender = data['sender'] as String?;
         final senderFullName = data['senderFullName'] as String?;
-        final isVideo = data['isVideo'] == 'true' || data['isVideo'] == true;
         final senderImage = data['senderImage'] as String?;
+        final isVideo = data['isVideo'] == 'true' || data['isVideo'] == true;
 
         if (roomId != null && sender != null) {
           CallKitService().showIncomingCall(
@@ -493,8 +620,26 @@ class PushNotificationService {
         }
         break;
       case 'CHAT_MESSAGE':
-        if (referenceId != null) {
-          Get.toNamed('/chat', arguments: referenceId.toString());
+      case 'CHAT':
+      case 'chat':
+      case 'MISSED_CALL':
+      case 'missed_call':
+        final sender = (data['sender'] ?? data['senderUsername'] ?? data['otherUsername'] ?? data['referenceId'] ?? referenceId)?.toString();
+        final senderFullName = data['senderFullName']?.toString();
+        final senderImage = data['senderImage']?.toString();
+
+        if (sender != null && sender.isNotEmpty) {
+          final inboxItem = InboxItem(
+            otherUsername: sender,
+            otherUserFirstName: senderFullName,
+            otherUserImageUrl: senderImage,
+            timestamp: DateTime.now(),
+          );
+          if (Get.currentRoute == '/chat') {
+            Get.offNamed('/chat', arguments: inboxItem);
+          } else {
+            Get.toNamed('/chat', arguments: inboxItem);
+          }
         }
         break;
       case 'ALLY_REQUEST':
@@ -505,6 +650,97 @@ class PushNotificationService {
         print('Unknown notification type: $type');
         break;
     }
+  }
+
+  static bool isUserInConversation(String senderUsername) {
+    if (senderUsername.isEmpty) return false;
+    if (Get.isRegistered<ChatController>()) {
+      final chatController = Get.find<ChatController>();
+      final otherUser = chatController.otherUsername;
+      if (otherUser != null && otherUser.toLowerCase() == senderUsername.toLowerCase()) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  static Future<void> showMessageNotification(Map<String, dynamic> data) async {
+    final String senderUsername = (data['sender'] ?? data['senderUsername'] ?? '').toString();
+    final String senderFullName = (data['senderFullName'] ?? data['senderName'] ?? senderUsername).toString();
+    final String content = (data['content'] ?? data['body'] ?? data['message'] ?? 'New message').toString();
+    String? senderImage = data['senderImage']?.toString();
+
+    if (senderUsername.isEmpty) return;
+
+    if (isUserInConversation(senderUsername)) {
+      print('PNS: User is in active conversation with $senderUsername — suppressing push notification.');
+      return;
+    }
+
+    final localNotifications = FlutterLocalNotificationsPlugin();
+    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const initSettings = InitializationSettings(android: androidSettings);
+
+    await localNotifications.initialize(
+      initSettings,
+      onDidReceiveNotificationResponse: (NotificationResponse response) {
+        if (response.payload != null) {
+          try {
+            final Map<String, dynamic> data = jsonDecode(response.payload!);
+            PushNotificationService.handleNavigation(data);
+          } catch (_) {}
+        }
+      },
+      onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
+    );
+
+    final largeIcon = await getLargeIcon(senderImage, senderFullName);
+
+    final payload = jsonEncode({
+      'type': 'CHAT_MESSAGE',
+      'sender': senderUsername,
+      'senderFullName': senderFullName,
+      'senderImage': senderImage,
+      'content': content,
+    });
+
+    final androidDetails = AndroidNotificationDetails(
+      'chat_messages_channel_v1',
+      'Message Notifications',
+      channelDescription: 'Notifications for new direct chat messages',
+      importance: Importance.high,
+      priority: Priority.high,
+      category: AndroidNotificationCategory.message,
+      largeIcon: largeIcon,
+      icon: '@mipmap/ic_launcher',
+    );
+
+    await localNotifications.show(
+      senderUsername.hashCode,
+      senderFullName.isNotEmpty ? senderFullName : senderUsername,
+      content,
+      NotificationDetails(android: androidDetails),
+      payload: payload,
+    );
+  }
+
+  static Future<void> clearNotificationsForUser(String username) async {
+    if (username.isEmpty) return;
+    try {
+      final localNotifications = FlutterLocalNotificationsPlugin();
+      await localNotifications.cancel(username.hashCode);
+    } catch (e) {
+      print('PNS: Error clearing notifications for user $username: $e');
+    }
+  }
+
+  static Future<void> syncFcmToken() async {
+    try {
+      final token = await FirebaseMessaging.instance.getToken();
+      if (token != null && token.isNotEmpty) {
+        await _syncTokenToBackend(token);
+      }
+    } catch (_) {}
   }
 
   static Future<void> _syncTokenToBackend(String token) async {
