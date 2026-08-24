@@ -69,15 +69,19 @@ Future<void> _initFirebaseAndPNS() async {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 1. Initialize Firebase & PNS first, before any heavy synchronous startup work
-  await _initFirebaseAndPNS();
-
-  // 2. Storage and env init
+  // 1. Storage and env init first — PushNotificationService.initialize()
+  // (called from _initFirebaseAndPNS below) syncs the FCM token to the
+  // backend immediately after fetching it, which needs dotenv loaded to
+  // resolve the backend URL. Loading it after caused a NotInitializedError
+  // on every cold start, silently breaking FCM token registration.
   try {
     await SafeTextFilter.init(language: Language.english);
   } catch (_) {}
   await GetStorage.init();
   await dotenv.load(fileName: '.env.dev');
+
+  // 2. Initialize Firebase & PNS
+  await _initFirebaseAndPNS();
 
   runApp(const LivePoisedApp());
 }

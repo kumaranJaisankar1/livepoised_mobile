@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get/get.dart';
@@ -12,6 +14,7 @@ import 'package:get_storage/get_storage.dart';
 
 import '../../../core/services/push_notification_service.dart';
 import '../../../core/services/pip_service.dart';
+import '../../../core/services/callkit_service.dart';
 import '../../../core/constants/api_endpoints.dart';
 import '../../../core/network/dio_client.dart';
 import '../../auth/auth_controller.dart';
@@ -83,7 +86,6 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
 
   void handleCallCancelledLocally() {
     _cancelRingingTimer();
-    PushNotificationService().dismissCallNotification();
     if (callState.value == callStateRinging || callState.value == callStateCalling) {
       _cleanupAndPop();
     }
@@ -125,8 +127,6 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
         'sender': _currentUsername,
       });
     }
-
-    PushNotificationService().dismissCallNotification();
 
     if (caller != null) {
       PushNotificationService.showMissedCallNotification({
@@ -181,12 +181,9 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _ws.connect();
-      // If user opens the app while an incoming call is still ringing, automatically open incoming call UI
-      if (callState.value == callStateRinging) {
-        if (Get.currentRoute != '/incoming-call' && Get.currentRoute != '/active-call') {
-          Get.toNamed('/incoming-call');
-        }
-      }
+      // The native CallKit/incoming-call UI (see CallKitService) already
+      // presents ringing calls regardless of app foreground state — nothing
+      // to navigate to here on resume.
     }
   }
 
@@ -239,12 +236,25 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
           final isForeground = WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
 
           if (isForeground) {
+            // App is active in foreground: navigate to in-app incoming call UI directly
             if (Get.currentRoute != '/incoming-call' && Get.currentRoute != '/active-call') {
               Get.toNamed('/incoming-call');
             }
+            // On iOS, also trigger CallKit for native status bar integration
+            if (Platform.isIOS) {
+              CallKitService().showIncomingCall(
+                id: currentRoomId.value ?? '',
+                roomId: currentRoomId.value ?? '',
+                sender: callerUsername.value ?? '',
+                senderFullName: remoteUserFullName.value ?? callerUsername.value ?? 'Incoming Call',
+                isVideo: incomingIsVideo.value,
+                senderImage: remoteUserProfileImage.value,
+              );
+            }
           } else {
-            // App is backgrounded — post high-priority incoming call heads-up card with Accept/Decline actions
-            PushNotificationService().showCallNotification(
+            // App is in background/locked: trigger native CallKit / Android Call UI
+            CallKitService().showIncomingCall(
+              id: currentRoomId.value ?? '',
               roomId: currentRoomId.value ?? '',
               sender: callerUsername.value ?? '',
               senderFullName: remoteUserFullName.value ?? callerUsername.value ?? 'Incoming Call',
@@ -406,7 +416,6 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
     final caller = callerUsername.value;
     if (roomId == null || caller == null) return;
 
-    PushNotificationService().dismissCallNotification();
     _cancelRingingTimer();
 
     final hasPermissions = await _requestPermissions(withVideo: incomingIsVideo.value);
@@ -760,27 +769,68 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
 
   final fln.FlutterLocalNotificationsPlugin _localNotifications = fln.FlutterLocalNotificationsPlugin();
 
-  void _showOngoingCallNotification() {
+  Future<void> _showOngoingCallNotification() async {
+    // Hide persistent notification banner if user is actively viewing full-screen active call UI in foreground
+    if (!isMinimized.value &&
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed &&
+        Get.currentRoute == '/active-call') {
+      _cancelOngoingCallNotification();
+      return;
+    }
+
     try {
-      const androidDetails = fln.AndroidNotificationDetails(
-        'active_call_silent_channel',
-        'Ongoing Call Notification',
-        channelDescription: 'Persistent quiet status bar notification for active calls',
-        importance: fln.Importance.low,
-        priority: fln.Priority.low,
+      final peerName = remoteUserFullName.value ?? callerUsername.value ?? 'Call';
+      final durationStr = formattedCallDuration;
+      final isVideo = incomingIsVideo.value;
+      String? imageUrl = remoteUserProfileImage.value;
+
+      fln.AndroidBitmap<Object>? largeIconBitmap;
+      if (imageUrl != null && imageUrl.trim().isNotEmpty) {
+        try {
+          String url = imageUrl.trim();
+          if (!url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('data:image')) {
+            if (url.startsWith('/')) url = url.substring(1);
+            url = 'https://s3.ap-south-1.amazonaws.com/livepoised/$url';
+          }
+          if (url.startsWith('http://') || url.startsWith('https://')) {
+            final request = await HttpClient().getUrl(Uri.parse(url)).timeout(const Duration(seconds: 3));
+            final response = await request.close();
+            if (response.statusCode == 200) {
+              final bytes = await response.fold<List<int>>([], (acc, chunk) => acc..addAll(chunk));
+              if (bytes.isNotEmpty) {
+                largeIconBitmap = fln.ByteArrayAndroidBitmap(Uint8List.fromList(bytes));
+              }
+            }
+          }
+        } catch (_) {}
+      }
+
+      final androidDetails = fln.AndroidNotificationDetails(
+        'active_call_channel_v5',
+        'Active Call Controls',
+        channelDescription: 'Ongoing active call notification with live duration timer and End Call button',
+        importance: fln.Importance.high,
+        priority: fln.Priority.high,
         ongoing: true,
         autoCancel: false,
         showWhen: true,
         icon: '@mipmap/ic_launcher',
+        largeIcon: largeIconBitmap,
+        actions: const [
+          fln.AndroidNotificationAction(
+            'end_call_action',
+            'End Call',
+            titleColor: Color.fromARGB(255, 239, 68, 68),
+            showsUserInterface: false,
+          ),
+        ],
       );
-      const details = fln.NotificationDetails(android: androidDetails, iOS: fln.DarwinNotificationDetails());
+      final details = fln.NotificationDetails(android: androidDetails, iOS: const fln.DarwinNotificationDetails());
 
-      final peerName = remoteUserFullName.value ?? callerUsername.value ?? 'Call';
-      final durationStr = formattedCallDuration;
       _localNotifications.show(
         8888,
-        'Ongoing Call • $durationStr',
-        'In call with $peerName',
+        peerName,
+        '$durationStr • ${isVideo ? 'Video Call' : 'Voice Call'}',
         details,
       );
     } catch (e) {
@@ -795,7 +845,9 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
   }
 
   void _onCallConnected() {
+    CallKitService().setConnected(currentRoomId.value ?? '');
     PipService().setCallActive(true);
+    _startDurationTimer();
     _maybePromptPipPermission();
   }
 
@@ -830,7 +882,7 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
 
   void _cleanupAndPop() {
     _cancelOngoingCallNotification();
-    PushNotificationService().dismissCallNotification();
+    CallKitService().endIncomingCall(currentRoomId.value ?? '');
     PipService().setCallActive(false);
     _callDurationTimer?.cancel();
     _callDurationTimer = null;
@@ -856,7 +908,8 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
     isScreenSharing.value = false;
     _isInitiator = false;
 
-    if (Get.currentRoute == '/incoming-call' || Get.currentRoute == '/active-call') {
+    // Pop all call screens (/incoming-call, /active-call) from GetX navigation stack
+    while (Get.currentRoute == '/incoming-call' || Get.currentRoute == '/active-call') {
       Get.back();
     }
   }

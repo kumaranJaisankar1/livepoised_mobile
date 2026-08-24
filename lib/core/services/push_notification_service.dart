@@ -3,111 +3,14 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
-import 'package:dio/dio.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:get_storage/get_storage.dart';
 import '../../features/call/data/livekit_service.dart';
 import '../../features/notification/data/services/notification_service.dart';
-import '../constants/api_endpoints.dart';
-
-const String _pendingCallActionKey = 'pending_call_action';
-
-/// Declines an incoming call without any live GetX/app state — safe to call
-/// from a background isolate (Android, app fully terminated) or before GetX
-/// has finished bootstrapping.
-Future<void> _declineCallHeadless(Map<String, dynamic> data) async {
-  try {
-    if (Firebase.apps.isEmpty) {
-      try {
-        await Firebase.initializeApp();
-      } catch (_) {}
-    }
-    if (!dotenv.isInitialized) {
-      try {
-        await dotenv.load(fileName: '.env.dev');
-      } catch (_) {}
-    }
-
-    const secureStorage = FlutterSecureStorage();
-    final token = await secureStorage.read(key: 'access_token');
-    if (token == null) return;
-
-    final baseUrl = ApiEndpoints.baseUrlFastAPI;
-    final dio = Dio(BaseOptions(
-      baseUrl: baseUrl,
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 10),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-    ));
-
-    await dio.post('/call/decline', data: {
-      'roomId': data['roomId'],
-      'receiver': data['sender'],
-      'senderFullName': data['senderFullName'],
-      'isVideo': data['isVideo'] == 'true' || data['isVideo'] == true,
-    });
-  } catch (e) {
-    print('PNS: Headless decline call failed: $e');
-  }
-}
-
-/// Persists an "accept this call" marker that survives across isolates/cold
-/// starts — works with no GetX/LiveKitService present. `InitialBinding`
-/// consumes it once GetX has actually booted, which avoids a race where the
-/// notification response arrives before `LiveKitService` is registered.
-Future<void> _persistPendingAcceptAction(Map<String, dynamic> data) async {
-  try {
-    await GetStorage.init();
-    final box = GetStorage();
-    await box.write(_pendingCallActionKey, {
-      'action': 'accept',
-      'roomId': data['roomId'],
-      'sender': data['sender'],
-      'senderFullName': data['senderFullName'],
-      'senderImage': data['senderImage'],
-      'isVideo': data['isVideo'] == 'true' || data['isVideo'] == true,
-    });
-  } catch (e) {
-    print('PNS: Failed to persist pending accept action: $e');
-  }
-}
-
-// NOTE: on Android, `showsUserInterface: false` actions (Decline) are always
-// routed here via a dedicated headless FlutterEngine, regardless of whether
-// the main app process is alive — this is the ONLY code path that ever runs
-// for Decline. `showsUserInterface: true` actions (Accept) always launch the
-// Activity directly instead and are delivered via the normal main-isolate
-// `onDidReceiveNotificationResponse` callback below, never here.
-@pragma('vm:entry-point')
-Future<void> _onBackgroundNotificationResponse(NotificationResponse response) async {
-  WidgetsFlutterBinding.ensureInitialized();
-
-  final localNotifications = FlutterLocalNotificationsPlugin();
-  try {
-    await localNotifications.cancel(9999);
-  } catch (_) {}
-
-  if (response.payload == null) return;
-  Map<String, dynamic> data;
-  try {
-    data = jsonDecode(response.payload!) as Map<String, dynamic>;
-  } catch (_) {
-    return;
-  }
-
-  if (response.actionId == 'decline_call') {
-    await _declineCallHeadless(data);
-  }
-}
+import 'callkit_service.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -129,14 +32,10 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       type == 'MISSED_CALL' ||
       content.contains('Missed') ||
       content.contains('Call ended')) {
-    final localNotifications = FlutterLocalNotificationsPlugin();
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const initSettings = InitializationSettings(android: androidSettings);
-    await localNotifications.initialize(initSettings);
-
-    try {
-      await localNotifications.cancel(9999);
-    } catch (_) {}
+    final roomId = message.data['roomId']?.toString();
+    if (roomId != null && roomId.isNotEmpty) {
+      await CallKitService().endIncomingCall(roomId);
+    }
 
     if (type == 'CALL_CANCELLED' || type == 'call:cancel' || type == 'MISSED_CALL' || content.contains('Missed')) {
       PushNotificationService.showMissedCallNotification(message.data);
@@ -145,7 +44,15 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   }
 
   if (type == 'INCOMING_CALL' || type == 'call:incoming') {
-    PushNotificationService.showBackgroundCallNotification(message.data);
+    final roomId = message.data['roomId']?.toString() ?? '';
+    await CallKitService().showIncomingCall(
+      id: roomId,
+      roomId: roomId,
+      sender: message.data['sender']?.toString() ?? '',
+      senderFullName: message.data['senderFullName']?.toString() ?? message.data['sender']?.toString() ?? 'Incoming Call',
+      isVideo: message.data['isVideo'] == 'true' || message.data['isVideo'] == true,
+      senderImage: message.data['senderImage']?.toString(),
+    );
   }
 }
 
@@ -263,61 +170,6 @@ class PushNotificationService {
     return ByteArrayAndroidBitmap(bytes);
   }
 
-  static Future<void> showBackgroundCallNotification(Map<String, dynamic> data) async {
-    final localNotifications = FlutterLocalNotificationsPlugin();
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const initSettings = InitializationSettings(android: androidSettings);
-    await localNotifications.initialize(initSettings);
-
-    final String senderFullName = data['senderFullName'] ?? data['sender'] ?? 'Incoming Call';
-    final String? senderImage = data['senderImage'];
-    final largeIcon = await _getLargeIcon(senderImage, senderFullName);
-
-    final androidDetails = AndroidNotificationDetails(
-      'incoming_call_v3_channel',
-      'Incoming Call Notifications',
-      channelDescription: 'Ringing incoming call notification banner with action buttons',
-      importance: Importance.max,
-      priority: Priority.max,
-      category: AndroidNotificationCategory.call,
-      fullScreenIntent: true,
-      playSound: true,
-      ongoing: true,
-      autoCancel: false,
-      visibility: NotificationVisibility.public,
-      audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
-      largeIcon: largeIcon,
-      actions: const [
-        AndroidNotificationAction(
-          'decline_call',
-          'Decline',
-          titleColor: Color(0xFFEF4444),
-          showsUserInterface: false,
-          cancelNotification: true,
-        ),
-        AndroidNotificationAction(
-          'accept_call',
-          'Accept',
-          titleColor: Color(0xFF10B981),
-          showsUserInterface: true,
-        ),
-      ],
-      icon: '@mipmap/ic_launcher',
-    );
-
-    final bool isVideo = data['isVideo'] == 'true' || data['isVideo'] == true;
-
-    final payload = jsonEncode(data);
-
-    await localNotifications.show(
-      9999,
-      senderFullName,
-      'Incoming ${isVideo ? "Video" : "Voice"} Call',
-      NotificationDetails(android: androidDetails),
-      payload: payload,
-    );
-  }
-
   static Future<void> showMissedCallNotification(Map<String, dynamic> data) async {
     final localNotifications = FlutterLocalNotificationsPlugin();
     const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -412,36 +264,19 @@ class PushNotificationService {
     }
 
     // 2. Initialize Local Notifications
+    // (Incoming-call ringing UI is owned by CallKitService now — this plugin
+    // instance only handles the missed-call notification's "Call Back"
+    // action and general (non-call) notification navigation.)
     try {
       const AndroidInitializationSettings androidSettings =
           AndroidInitializationSettings('@mipmap/ic_launcher');
-      final DarwinInitializationSettings iosSettings = DarwinInitializationSettings(
+      const DarwinInitializationSettings iosSettings = DarwinInitializationSettings(
         requestAlertPermission: false,
         requestBadgePermission: false,
         requestSoundPermission: false,
-        notificationCategories: [
-          DarwinNotificationCategory(
-            'incoming_call',
-            actions: [
-              DarwinNotificationAction.plain(
-                'accept_call',
-                'Accept',
-                options: {DarwinNotificationActionOption.foreground},
-              ),
-              // No `.foreground` option: iOS launches the app in the
-              // background to run this action without bringing the UI up.
-              DarwinNotificationAction.plain(
-                'decline_call',
-                'Decline',
-                options: {DarwinNotificationActionOption.destructive},
-              ),
-            ],
-            options: {DarwinNotificationCategoryOption.customDismissAction},
-          ),
-        ],
       );
 
-      final InitializationSettings initSettings = InitializationSettings(
+      const InitializationSettings initSettings = InitializationSettings(
         android: androidSettings,
         iOS: iosSettings,
       );
@@ -450,33 +285,9 @@ class PushNotificationService {
       await _localNotifications.initialize(
         initSettings,
         onDidReceiveNotificationResponse: (NotificationResponse response) {
-          dismissCallNotification();
-          if (response.actionId == 'accept_call') {
-            if (response.payload != null) {
-              try {
-                final Map<String, dynamic> data = jsonDecode(response.payload!);
-                if (Get.isRegistered<LiveKitService>()) {
-                  Get.find<LiveKitService>().acceptCallWithData(
-                    roomId: data['roomId'],
-                    caller: data['sender'],
-                    isVideo: data['isVideo'] == 'true' || data['isVideo'] == true,
-                  );
-                } else {
-                  // Cold start: this callback can fire before InitialBinding
-                  // has registered LiveKitService. Persist the accept intent
-                  // so InitialBinding joins the call directly once it boots,
-                  // instead of falling back to the ringing screen.
-                  _persistPendingAcceptAction(data);
-                }
-              } catch (_) {}
-            }
-          } else if (response.actionId == 'decline_call') {
+          if (response.actionId == 'end_call_action') {
             if (Get.isRegistered<LiveKitService>()) {
-              Get.find<LiveKitService>().declineCall();
-            } else if (response.payload != null) {
-              try {
-                _declineCallHeadless(jsonDecode(response.payload!));
-              } catch (_) {}
+              Get.find<LiveKitService>().endCall();
             }
           } else if (response.actionId == 'call_back') {
             if (response.payload != null) {
@@ -496,7 +307,6 @@ class PushNotificationService {
             } catch (_) {}
           }
         },
-        onDidReceiveBackgroundNotificationResponse: _onBackgroundNotificationResponse,
       );
     } catch (e) {
       print('PNS Warning: Local notifications initialize error: $e');
@@ -519,7 +329,6 @@ class PushNotificationService {
             type == 'MISSED_CALL' ||
             content.contains('Missed') ||
             content.contains('Call ended')) {
-          dismissCallNotification();
           if (Get.isRegistered<LiveKitService>()) {
             Get.find<LiveKitService>().handleCallCancelledLocally();
           }
@@ -527,20 +336,12 @@ class PushNotificationService {
         }
 
         if (type == 'INCOMING_CALL' || type == 'call:incoming') {
-          // Foreground: DO NOT show local push notification card (avoid duplicate notification over full-screen UI).
-          // Only update LiveKit state and navigate to /incoming-call full-screen ringing UI.
-          if (Get.isRegistered<LiveKitService>()) {
-            final livekit = Get.find<LiveKitService>();
-            livekit.currentRoomId.value = message.data['roomId'];
-            livekit.callerUsername.value = message.data['sender'];
-            livekit.remoteUserFullName.value = message.data['senderFullName'] ?? message.data['sender'];
-            livekit.remoteUserProfileImage.value = message.data['senderImage'];
-            livekit.incomingIsVideo.value = message.data['isVideo'] == 'true' || message.data['isVideo'] == true;
-            livekit.callState.value = callStateRinging;
-          }
-          if (Get.currentRoute != '/incoming-call' && Get.currentRoute != '/active-call') {
-            Get.toNamed('/incoming-call');
-          }
+          // No-op here: while the app is alive/foregrounded, the live
+          // ChatWebSocketService already delivers this same signal to
+          // LiveKitService, which is what shows the CallKit incoming-call
+          // UI (see CallKitService) — handling it a second time here would
+          // risk a duplicate showCallkitIncoming call.
+          return;
         } else if (notification != null) {
           _showLocalNotification(notification, message.data);
         }
@@ -640,12 +441,6 @@ class PushNotificationService {
     );
   }
 
-  void dismissCallNotification() {
-    try {
-      _localNotifications.cancel(9999);
-    } catch (_) {}
-  }
-
   void _showLocalNotification(RemoteNotification notification, Map<String, dynamic> data) {
     const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
       'high_importance_channel',
@@ -687,18 +482,14 @@ class PushNotificationService {
         final senderImage = data['senderImage'] as String?;
 
         if (roomId != null && sender != null) {
-          if (Get.isRegistered<LiveKitService>()) {
-            final livekit = Get.find<LiveKitService>();
-            livekit.currentRoomId.value = roomId;
-            livekit.callerUsername.value = sender;
-            livekit.remoteUserFullName.value = senderFullName ?? sender;
-            livekit.remoteUserProfileImage.value = senderImage;
-            livekit.incomingIsVideo.value = isVideo;
-            livekit.callState.value = callStateRinging;
-          }
-          if (Get.currentRoute != '/incoming-call' && Get.currentRoute != '/active-call') {
-            Get.toNamed('/incoming-call');
-          }
+          CallKitService().showIncomingCall(
+            id: roomId,
+            roomId: roomId,
+            sender: sender,
+            senderFullName: senderFullName ?? sender,
+            isVideo: isVideo,
+            senderImage: senderImage,
+          );
         }
         break;
       case 'CHAT_MESSAGE':

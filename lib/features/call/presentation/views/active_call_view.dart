@@ -16,16 +16,109 @@ class ActiveCallView extends StatelessWidget {
       final isInNativePip = lk.isInNativePip.value;
 
       if (isInNativePip) {
-        // Real OS-level PiP window (Android): the whole Activity has been
-        // shrunk by the system, so render a chrome-free, full-bleed video
-        // view with no controls — there's no room/need for them here.
+        final remoteName = lk.remoteUserFullName.value ?? lk.callerUsername.value ?? 'Peer';
+        final remotePic = lk.remoteUserProfileImage.value;
+
         return Scaffold(
           backgroundColor: const Color(0xFF0F172A),
           body: Obx(() {
             final track = lk.screenShareTrack.value ?? lk.remoteVideoTrack.value;
-            return track != null
-                ? VideoTrackRenderer(track)
-                : Container(color: const Color(0xFF0F172A));
+            return Stack(
+              children: [
+                // Video Track (if video active) or Full-Bleed WhatsApp Style Dark Canvas with Avatar & Duration
+                Positioned.fill(
+                  child: track != null
+                      ? VideoTrackRenderer(track)
+                      : Container(
+                          color: const Color(0xFF0F172A),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              CircleAvatar(
+                                radius: 26,
+                                backgroundImage: ImageUtils.getImageProvider(remotePic),
+                                child: (remotePic == null || remotePic.isEmpty)
+                                    ? Text(
+                                        remoteName.isNotEmpty ? remoteName[0].toUpperCase() : 'P',
+                                        style: const TextStyle(
+                                          fontSize: 20,
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      )
+                                    : null,
+                              ),
+                              const SizedBox(height: 6),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                                child: Text(
+                                  remoteName,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                lk.formattedCallDuration,
+                                style: const TextStyle(
+                                  color: Colors.tealAccent,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                ),
+
+                // Call Action Controls Overlay (Mute Mic & Red End Call)
+                Positioned(
+                  bottom: 8,
+                  left: 8,
+                  right: 8,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      InkWell(
+                        onTap: () => lk.toggleMute(),
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.75),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            lk.isMuted.value ? Icons.mic_off : Icons.mic,
+                            color: lk.isMuted.value ? Colors.redAccent : Colors.white,
+                            size: 16,
+                          ),
+                        ),
+                      ),
+                      InkWell(
+                        onTap: () => lk.endCall(),
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: const BoxDecoration(
+                            color: Colors.redAccent,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.call_end,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            );
           }),
         );
       }

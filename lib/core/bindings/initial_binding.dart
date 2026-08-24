@@ -8,6 +8,7 @@ import '../../features/call/data/livekit_service.dart';
 import '../../features/notification/presentation/controllers/notification_controller.dart';
 import '../../features/network/presentation/controllers/network_controller.dart';
 import '../../features/profile/presentation/controllers/profile_controller.dart';
+import '../services/callkit_service.dart';
 
 const String _pendingCallActionKey = 'pending_call_action';
 
@@ -23,6 +24,7 @@ class InitialBinding extends Bindings {
     Get.put(NetworkController());
     Get.put(ProfileController());
     chatWs.connect();
+    CallKitService().init();
 
     _consumePendingCallAction(storage);
   }

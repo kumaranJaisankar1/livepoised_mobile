@@ -124,7 +124,7 @@ class MainActivity : FlutterActivity() {
         if (!isPipSupported()) return false
         return try {
             val params = PictureInPictureParams.Builder()
-                .setAspectRatio(Rational(9, 16))
+                .setAspectRatio(Rational(3, 4))
                 .setActions(buildPipActions())
                 .build()
             enterPictureInPictureMode(params)
@@ -136,7 +136,9 @@ class MainActivity : FlutterActivity() {
 
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
-        if (isCallActive && isPipSupported()) {
+        // Only auto-enter PiP if a call is active AND user was actively interacting with the app (has window focus)
+        // This prevents PiP from launching during background-to-foreground transition when accepting from notification.
+        if (isCallActive && isPipSupported() && hasWindowFocus()) {
             enterPip()
         }
     }

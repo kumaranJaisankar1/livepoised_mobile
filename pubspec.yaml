@@ -50,6 +50,7 @@ dependencies:
   livekit_client: ^2.4.0
   permission_handler: ^11.3.1
   wakelock_plus: ^1.2.8
+  flutter_callkit_incoming: ^3.1.5
 
   # Models and JSON serialization
   freezed_annotation: ^2.4.1
