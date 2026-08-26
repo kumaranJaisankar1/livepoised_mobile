@@ -15,6 +15,7 @@ import 'package:get_storage/get_storage.dart';
 import '../../features/call/data/livekit_service.dart';
 import '../constants/api_endpoints.dart';
 import '../network/dio_client.dart';
+import '../utils/app_logger.dart';
 
 const String _pendingCallActionKey = 'pending_call_action';
 
@@ -57,7 +58,7 @@ Future<void> declineCallHeadless(Map<dynamic, dynamic> data) async {
       'isVideo': data['isVideo'] == 'true' || data['isVideo'] == true,
     });
   } catch (e) {
-    print('CallKitService: Headless decline call failed: $e');
+    logCall('CallKitService: Headless decline call failed: $e');
   }
 }
 
@@ -78,7 +79,7 @@ Future<void> persistPendingAcceptAction(Map<dynamic, dynamic> data) async {
       'isVideo': data['isVideo'] == 'true' || data['isVideo'] == true,
     });
   } catch (e) {
-    print('CallKitService: Failed to persist pending accept action: $e');
+    logCall('CallKitService: Failed to persist pending accept action: $e');
   }
 }
 
@@ -120,7 +121,7 @@ class CallKitService {
     try {
       FlutterCallkitIncoming.onBackgroundMessage(callkitBackgroundMessageHandler);
     } catch (e) {
-      print('CallKitService: Failed to register background message handler: $e');
+      logCall('CallKitService: Failed to register background message handler: $e');
     }
 
     if (Platform.isAndroid) {
@@ -151,7 +152,7 @@ class CallKitService {
           );
         });
       } catch (e) {
-        print('CallKitService: Failed to register acceptCallHandle: $e');
+        logCall('CallKitService: Failed to register acceptCallHandle: $e');
       }
     }
 
@@ -183,7 +184,7 @@ class CallKitService {
         'apns_voip_token': token,
       });
     } catch (e) {
-      print('CallKitService: Failed to sync VoIP token: $e');
+      logCall('CallKitService: Failed to sync VoIP token: $e');
     }
   }
 
@@ -286,7 +287,7 @@ String stringToUuid(String input) {
     try {
       final active = await FlutterCallkitIncoming.activeCalls();
       if (active.any((call) => call.id == uuid)) {
-        print('CallKitService: showIncomingCall — ignoring duplicate/redelivered push for already-active call $uuid');
+        logCall('CallKitService: showIncomingCall — ignoring duplicate/redelivered push for already-active call $uuid');
         return;
       }
     } catch (_) {}
@@ -308,7 +309,7 @@ String stringToUuid(String input) {
     // console) right when a call arrives to see exactly what was received vs
     // resolved — narrows down "no image data sent" vs "URL fine, native-side
     // load is failing" without more guessing from source alone.
-    print('CallKitService: showIncomingCall — raw senderImage length=${senderImage?.length ?? 0} -> resolved avatar="$safeAvatar"');
+    logCall('CallKitService: showIncomingCall — raw senderImage length=${senderImage?.length ?? 0} -> resolved avatar="$safeAvatar"');
 
     final params = CallKitParams(
       id: uuid,
@@ -345,7 +346,7 @@ String stringToUuid(String input) {
     try {
       await FlutterCallkitIncoming.showCallkitIncoming(params);
     } catch (e) {
-      print('CallKitService: Error presenting showCallkitIncoming: $e');
+      logCall('CallKitService: Error presenting showCallkitIncoming: $e');
     }
   }
 
@@ -368,6 +369,7 @@ String stringToUuid(String input) {
       _isProgrammaticDismissal = true;
       final String uuid = stringToUuid(id);
       await FlutterCallkitIncoming.endCall(uuid);
+      await _deleteAvatarFile(uuid);
     } catch (_) {} finally {
       Future.delayed(const Duration(milliseconds: 500), () {
         _isProgrammaticDismissal = false;
@@ -380,11 +382,39 @@ String stringToUuid(String input) {
     try {
       _isProgrammaticDismissal = true;
       await FlutterCallkitIncoming.endAllCalls();
+      await _sweepAvatarFiles();
     } catch (_) {} finally {
       Future.delayed(const Duration(milliseconds: 500), () {
         _isProgrammaticDismissal = false;
       });
     }
+  }
+
+  /// Deletes the base64-decoded avatar temp file written for one call (see
+  /// _writeBase64AvatarToFile) — these were never cleaned up before, so every
+  /// base64-avatar incoming call left a small JPEG behind permanently.
+  static Future<void> _deleteAvatarFile(String uuid) async {
+    try {
+      final file = File('${Directory.systemTemp.path}/call_avatar_$uuid.jpg');
+      if (await file.exists()) {
+        await file.delete();
+      }
+    } catch (_) {}
+  }
+
+  /// Sweeps every avatar temp file — used when ending all calls at once,
+  /// since there's no single uuid to target individually there.
+  static Future<void> _sweepAvatarFiles() async {
+    try {
+      final dir = Directory.systemTemp;
+      await for (final entity in dir.list()) {
+        if (entity is File && entity.uri.pathSegments.last.startsWith('call_avatar_')) {
+          try {
+            await entity.delete();
+          } catch (_) {}
+        }
+      }
+    } catch (_) {}
   }
 
   /// Resolves a possibly-relative stored image path into the full S3 URL —
@@ -417,7 +447,7 @@ String stringToUuid(String input) {
       await file.writeAsBytes(bytes);
       return 'file://${file.path}';
     } catch (e) {
-      print('CallKitService: Failed to decode/write base64 avatar: $e');
+      logCall('CallKitService: Failed to decode/write base64 avatar: $e');
       return null;
     }
   }

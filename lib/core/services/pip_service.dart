@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/services.dart';
+import '../utils/app_logger.dart';
 
 /// Thin wrapper around the native Android Picture-in-Picture platform channel.
 /// No-ops on iOS/other platforms — real OS PiP is Android-only for now.
@@ -26,9 +27,11 @@ class PipService {
   Future<dynamic> _handleMethodCall(MethodCall call) async {
     if (call.method == 'onPipModeChanged') {
       final isInPip = call.arguments as bool? ?? false;
+      logCall('PipService: native onPipModeChanged -> isInPip=$isInPip');
       _modeChangedController.add(isInPip);
     } else if (call.method == 'onPipAction') {
       final action = call.arguments as String?;
+      logCall('PipService: native onPipAction -> $action');
       if (action != null) _actionController.add(action);
     }
   }
@@ -60,6 +63,7 @@ class PipService {
 
   Future<void> setCallActive(bool active) async {
     if (!Platform.isAndroid) return;
+    logCall('PipService: setCallActive($active)');
     try {
       await _channel.invokeMethod('setCallActive', active);
     } catch (_) {}
@@ -68,7 +72,9 @@ class PipService {
   Future<bool> enterPip() async {
     if (!Platform.isAndroid) return false;
     try {
-      return await _channel.invokeMethod<bool>('enterPip') ?? false;
+      final result = await _channel.invokeMethod<bool>('enterPip') ?? false;
+      logCall('PipService: enterPip() manual call -> $result');
+      return result;
     } catch (_) {
       return false;
     }

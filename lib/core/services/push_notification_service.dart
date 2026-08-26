@@ -14,6 +14,7 @@ import '../../features/notification/data/services/notification_service.dart';
 import '../../features/chat/data/models/inbox_item.dart';
 import '../../features/chat/presentation/controllers/chat_controller.dart';
 import '../constants/api_endpoints.dart';
+import '../utils/app_logger.dart';
 import 'callkit_service.dart';
 
 @pragma('vm:entry-point')
@@ -59,7 +60,7 @@ Future<void> notificationTapBackground(NotificationResponse response) async {
           }
         }
       } catch (e) {
-        print('PNS Error in background notification tap: $e');
+        logCall('PNS Error in background notification tap: $e');
       }
     }
   } else if (response.payload != null) {
@@ -77,7 +78,7 @@ Future<void> notificationTapBackground(NotificationResponse response) async {
         });
       }
     } catch (e) {
-      print('PNS Error in background chat notification tap: $e');
+      logCall('PNS Error in background chat notification tap: $e');
     }
   }
 }
@@ -189,7 +190,7 @@ void handleNotificationResponse(NotificationResponse response) {
 
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  print("PNS: Handling background FCM message: ${message.messageId}, type: ${message.data['type']}");
+  logCall("PNS: Handling background FCM message: ${message.messageId}, type: ${message.data['type']}");
   WidgetsFlutterBinding.ensureInitialized();
   if (Firebase.apps.isEmpty) {
     try {
@@ -228,6 +229,11 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
   if (type == 'INCOMING_CALL' || type == 'call:incoming') {
     final roomId = message.data['roomId']?.toString() ?? '';
+    // Timed rather than left implicit — this is the "push received -> ring
+    // shown" interval from the performance audit, the one entirely inside
+    // this app's own control (everything before it is FCM/provider/device
+    // delivery, which isn't observable from here).
+    final receivedAt = DateTime.now();
     // showIncomingCall resolves the S3 path / decodes base64 itself now —
     // pass the raw value straight through rather than duplicating that logic.
     await CallKitService().showIncomingCall(
@@ -238,6 +244,7 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       isVideo: message.data['isVideo'] == 'true' || message.data['isVideo'] == true,
       senderImage: message.data['senderImage']?.toString(),
     );
+    logCall('PNS: push received -> ring shown took ${DateTime.now().difference(receivedAt).inMilliseconds}ms');
     return;
   }
 
@@ -279,7 +286,7 @@ class PushNotificationService {
           if (cropped != null) return cropped;
         }
       } catch (e) {
-        print('PNS: Error fetching profile image for largeIcon: $e');
+        logCall('PNS: Error fetching profile image for largeIcon: $e');
       }
     }
 
@@ -331,7 +338,7 @@ class PushNotificationService {
         return ByteArrayAndroidBitmap(byteData.buffer.asUint8List());
       }
     } catch (e) {
-      print('PNS: Error generating initial avatar: $e');
+      logCall('PNS: Error generating initial avatar: $e');
     }
     return null;
   }
@@ -362,7 +369,7 @@ class PushNotificationService {
         return ByteArrayAndroidBitmap(byteData.buffer.asUint8List());
       }
     } catch (e) {
-      print('PNS: Error creating circular avatar: $e');
+      logCall('PNS: Error creating circular avatar: $e');
     }
     return ByteArrayAndroidBitmap(bytes);
   }
@@ -439,9 +446,9 @@ class PushNotificationService {
   }
 
   Future<void> initialize() async {
-    print('PNS: Starting initialization');
+    logCall('PNS: Starting initialization');
     if (Firebase.apps.isEmpty) {
-      print('PNS: Firebase app is not initialized. Skipping PushNotificationService initialization.');
+      logCall('PNS: Firebase app is not initialized. Skipping PushNotificationService initialization.');
       return;
     }
     
@@ -449,12 +456,12 @@ class PushNotificationService {
     try {
       FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
     } catch (e) {
-      print('PNS Warning: Could not register onBackgroundMessage: $e');
+      logCall('PNS Warning: Could not register onBackgroundMessage: $e');
     }
 
     // 1. Request permissions
     try {
-      print('PNS: Requesting FCM permission...');
+      logCall('PNS: Requesting FCM permission...');
       NotificationSettings settings = await _fcm.requestPermission(
         alert: true,
         badge: true,
@@ -462,24 +469,24 @@ class PushNotificationService {
       );
 
       if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-        print('User granted permission');
+        logCall('User granted permission');
       }
       try {
         final token = await _fcm.getToken();
-        print('PNS: FCM Token registered -> $token');
+        logCall('PNS: FCM Token registered -> $token');
         if (token != null) {
           _syncTokenToBackend(token);
         }
       } catch (e) {
-        print('PNS Warning: Could not get FCM token: $e');
+        logCall('PNS Warning: Could not get FCM token: $e');
       }
 
       _fcm.onTokenRefresh.listen((newToken) {
-        print('PNS: FCM Token refreshed -> $newToken');
+        logCall('PNS: FCM Token refreshed -> $newToken');
         _syncTokenToBackend(newToken);
       });
     } catch (e) {
-      print('PNS Warning: FCM requestPermission error: $e');
+      logCall('PNS Warning: FCM requestPermission error: $e');
     }
 
     // 2. Initialize Local Notifications
@@ -500,21 +507,21 @@ class PushNotificationService {
         iOS: iosSettings,
       );
 
-      print('PNS: Initializing local notifications...');
+      logCall('PNS: Initializing local notifications...');
       await _localNotifications.initialize(
         initSettings,
         onDidReceiveNotificationResponse: handleNotificationResponse,
         onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
       );
     } catch (e) {
-      print('PNS Warning: Local notifications initialize error: $e');
+      logCall('PNS Warning: Local notifications initialize error: $e');
     }
 
-    print('PNS: Setting up FCM message listeners...');
+    logCall('PNS: Setting up FCM message listeners...');
     try {
       // 3. Handle Foreground Messages
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-        print('Got a message whilst in the foreground!');
+        logCall('Got a message whilst in the foreground!');
         RemoteNotification? notification = message.notification;
 
         final String? type = message.data['type']?.toString();
@@ -560,24 +567,24 @@ class PushNotificationService {
 
       // 4. Handle Notification Click when App is in Background
       FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-        print('Notification clicked (Background stage)');
+        logCall('Notification clicked (Background stage)');
         handleNavigation(message.data);
       });
 
       // 5. Check for Terminated State Launch
       _fcm.getInitialMessage().then((RemoteMessage? initialMessage) {
         if (initialMessage != null) {
-          print('Notification clicked (Terminated stage)');
+          logCall('Notification clicked (Terminated stage)');
           handleNavigation(initialMessage.data);
         }
       }).catchError((e) {
-        print('PNS Error: Failed to get initial message: $e');
+        logCall('PNS Error: Failed to get initial message: $e');
       });
     } catch (e) {
-      print('PNS Warning: FCM listeners setup error: $e');
+      logCall('PNS Warning: FCM listeners setup error: $e');
     }
     
-    print('PNS: Initialization complete');
+    logCall('PNS: Initialization complete');
   }
 
   void _showLocalNotification(RemoteNotification notification, Map<String, dynamic> data) {
@@ -607,7 +614,7 @@ class PushNotificationService {
     final String? type = data['type'];
     final dynamic referenceId = data['referenceId'];
 
-    print('PNS: Navigating for notification type: $type, data: $data');
+    logCall('PNS: Navigating for notification type: $type, data: $data');
 
     switch (type) {
       case 'INCOMING_CALL':
@@ -660,7 +667,7 @@ class PushNotificationService {
         Get.toNamed('/neuro-wellness');
         break;
       default:
-        print('Unknown notification type: $type');
+        logCall('Unknown notification type: $type');
         break;
     }
   }
@@ -686,7 +693,7 @@ class PushNotificationService {
     if (senderUsername.isEmpty) return;
 
     if (isUserInConversation(senderUsername)) {
-      print('PNS: User is in active conversation with $senderUsername — suppressing push notification.');
+      logCall('PNS: User is in active conversation with $senderUsername — suppressing push notification.');
       return;
     }
 
@@ -737,7 +744,7 @@ class PushNotificationService {
       final localNotifications = FlutterLocalNotificationsPlugin();
       await localNotifications.cancel(username.hashCode);
     } catch (e) {
-      print('PNS: Error clearing notifications for user $username: $e');
+      logCall('PNS: Error clearing notifications for user $username: $e');
     }
   }
 
@@ -752,7 +759,7 @@ class PushNotificationService {
 
   static Future<void> _syncTokenToBackend(String token) async {
     try {
-      print('PNS: Syncing FCM token to backend...');
+      logCall('PNS: Syncing FCM token to backend...');
       if (Get.isRegistered<NotificationService>()) {
         final ns = Get.find<NotificationService>();
         await ns.registerDeviceToken(fcmToken: token);
@@ -761,7 +768,7 @@ class PushNotificationService {
         await ns.registerDeviceToken(fcmToken: token);
       }
     } catch (e) {
-      print('PNS Error: Failed to sync FCM token to backend: $e');
+      logCall('PNS Error: Failed to sync FCM token to backend: $e');
     }
   }
 }

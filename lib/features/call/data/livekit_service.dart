@@ -13,6 +13,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart' as
 import 'package:get_storage/get_storage.dart';
 
 import '../../../core/services/push_notification_service.dart';
+import '../../../core/utils/app_logger.dart';
 import '../../../core/services/pip_service.dart';
 import '../../../core/services/callkit_service.dart';
 import '../../../core/constants/api_endpoints.dart';
@@ -72,6 +73,13 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
   Timer? _callDurationTimer;
   Timer? _ringingTimer;
 
+  // The ongoing-call notification refreshes every second (duration ticking
+  // up), but the caller's avatar never changes for the life of one call —
+  // fetched once here and reused, instead of re-downloading/re-decoding it
+  // on every single tick.
+  fln.AndroidBitmap<Object>? _ongoingCallIconBitmap;
+  String? _ongoingCallIconForUrl;
+
   String get formattedCallDuration {
     final seconds = callDurationSeconds.value;
     final mins = seconds ~/ 60;
@@ -103,7 +111,7 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
   void _startRingingTimer() {
     _ringingTimer?.cancel();
     _ringingTimer = Timer(const Duration(seconds: 30), () {
-      print('LiveKitService: 30-second ringing timeout reached');
+      logCall('LiveKitService: 30-second ringing timeout reached');
       _handleRingingTimeout();
     });
   }
@@ -177,6 +185,16 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
     _wsSub = _ws.rawMessages.listen(_handleSignal);
     _pipModeSub = PipService().onModeChanged.listen((isInPip) {
       isInNativePip.value = isInPip;
+      // Real system PiP shrinks whatever screen is currently on top —
+      // if the call was minimized in-app (e.g. the user browsed elsewhere
+      // while the FloatingCallOverlay bar showed), backgrounding into PiP
+      // would otherwise squeeze that other screen into the tiny PiP window
+      // instead of showing the call. Force the dedicated PiP-aware call
+      // screen (ActiveCallView's isInNativePip branch) so PiP always shows
+      // a call overview, never whatever the user happened to be looking at.
+      if (isInPip && callState.value == callStateConnected && Get.currentRoute != '/active-call') {
+        Get.toNamed('/active-call');
+      }
     });
     _pipActionSub = PipService().onPipAction.listen((action) {
       if (action == 'end_call') {
@@ -201,11 +219,22 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       _ws.connect();
       PushNotificationService.syncFcmToken();
-      if (callState.value == callStateRinging || currentRoomId.value != null) {
+      // Only genuinely-ringing calls need a resume-triggered navigation —
+      // `currentRoomId` stays set for the entire call (ringing AND
+      // connected), so checking it here used to treat "call is connected"
+      // the same as "call is ringing, show the incoming screen." The only
+      // thing preventing that from misfiring on a connected call was the
+      // Get.currentRoute check below, which races against the PiP-mode
+      // listener (a separate, independently-timed native->Dart signal) —
+      // both entering and exiting PiP cycle this app through `resumed`,
+      // with no ordering guarantee against PiP's own route-settling. That
+      // race was showing a duplicate incoming-call screen on top of an
+      // already-connected call after expanding out of PiP.
+      if (callState.value == callStateRinging) {
         if (Get.currentRoute != '/incoming-call' && Get.currentRoute != '/active-call') {
           Get.toNamed('/incoming-call');
         }
-      } else {
+      } else if (callState.value == callStateIdle) {
         _checkActiveIncomingCall();
       }
     }
@@ -241,7 +270,7 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
         }
       }
     } catch (e) {
-      print('LiveKitService: Error checking active incoming call on resume: $e');
+      logCall('LiveKitService: Error checking active incoming call on resume: $e');
     }
   }
 
@@ -289,7 +318,7 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
         }
       }
     } catch (e) {
-      print('LiveKitService: Could not fetch caller profile for $username: $e');
+      logCall('LiveKitService: Could not fetch caller profile for $username: $e');
     }
   }
 
@@ -298,7 +327,7 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
     final type = msg['type'] as String?;
     if (type == null || !type.startsWith('call:')) return;
 
-    print('LiveKitService: Handled call signal -> $type');
+    logCall('LiveKitService: Handled call signal -> $type');
 
     switch (type) {
       case 'call:incoming':
@@ -426,7 +455,7 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
       }
       return true;
     } catch (e) {
-      print('LiveKitService: Permission request handled safely: $e');
+      logCall('LiveKitService: Permission request handled safely: $e');
       return true;
     }
   }
@@ -493,7 +522,7 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
           'senderFullName': localUserFullName.value,
         });
       } else {
-        print('LiveKitService: Could not deliver call:incoming — WebSocket never connected');
+        logCall('LiveKitService: Could not deliver call:incoming — WebSocket never connected');
       }
     }();
 
@@ -581,7 +610,7 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
           'sender': _currentUsername,
         });
       } else {
-        print('LiveKitService: Could not deliver call:accept — WebSocket never connected');
+        logCall('LiveKitService: Could not deliver call:accept — WebSocket never connected');
       }
     }();
 
@@ -627,7 +656,7 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
       }
     }
 
-    print('LiveKitService: Ending call in room $roomId with peer $peer (myUser: $myUser)');
+    logCall('LiveKitService: Ending call in room $roomId with peer $peer (myUser: $myUser)');
 
     if (roomId != null && peer != null && peer.isNotEmpty) {
       _ws.sendRaw({
@@ -808,7 +837,7 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
         activeAudioDevice.value = 'Speaker';
       }
     } catch (e) {
-      print('LiveKitService: Error fetching audio devices: $e');
+      logCall('LiveKitService: Error fetching audio devices: $e');
       activeAudioDevice.value = 'Speaker';
     }
   }
@@ -823,7 +852,7 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
       await Hardware.instance.selectAudioOutput(device);
       activeAudioDevice.value = device.label.isNotEmpty ? device.label : 'Audio Device';
     } catch (e) {
-      print('LiveKitService: Error selecting audio device: $e');
+      logCall('LiveKitService: Error selecting audio device: $e');
     }
   }
 
@@ -854,7 +883,7 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
         await PipService().stopScreenShareService();
       }
     } catch (e) {
-      print('Screen share permission error: $e');
+      logCall('Screen share permission error: $e');
       isScreenSharing.value = false;
       isMinimized.value = false;
       await PipService().stopScreenShareService();
@@ -870,10 +899,25 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
 
   void toggleMinimize() {
     final newMin = !isMinimized.value;
+    logCall('LiveKitService: toggleMinimize -> isMinimized=$newMin (isInNativePip=${isInNativePip.value})');
     isMinimized.value = newMin;
     if (newMin) {
       if (Get.currentRoute == '/active-call') {
-        Get.back();
+        // A call accepted straight from a killed-app push notification
+        // navigates directly to /active-call as the very first route (see
+        // InitialBinding._consumePendingCallAction) — nothing is pushed
+        // underneath it. Get.back() in that case has no route left to
+        // reveal, which is exactly the black screen reported when
+        // minimizing right after that kind of cold-start accept. Falling
+        // back to the home route keeps the call running (isMinimized/the
+        // floating overlay are independent of navigation) while actually
+        // showing something instead of an empty stack.
+        final canPop = Get.key.currentState?.canPop() ?? false;
+        if (canPop) {
+          Get.back();
+        } else {
+          Get.offNamed('/');
+        }
       }
     } else {
       if (Get.currentRoute != '/active-call') {
@@ -893,7 +937,7 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
         });
         room?.localParticipant?.publishData(utf8.encode(payload), reliable: true);
       } catch (e) {
-        print('LiveKitService: Error publishing reaction data: $e');
+        logCall('LiveKitService: Error publishing reaction data: $e');
       }
 
       if (peer != null) {
@@ -958,10 +1002,22 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
       final isVideo = incomingIsVideo.value;
       String? imageUrl = remoteUserProfileImage.value;
 
-      fln.AndroidBitmap<Object>? largeIconBitmap;
-      try {
-        largeIconBitmap = await PushNotificationService.getLargeIcon(imageUrl, peerName);
-      } catch (_) {}
+      fln.AndroidBitmap<Object>? largeIconBitmap = _ongoingCallIconBitmap;
+      if (_ongoingCallIconForUrl != imageUrl) {
+        try {
+          largeIconBitmap = await PushNotificationService.getLargeIcon(imageUrl, peerName);
+          _ongoingCallIconBitmap = largeIconBitmap;
+          _ongoingCallIconForUrl = imageUrl;
+        } catch (_) {}
+      }
+
+      // The icon fetch above is async network/decode work — if the call
+      // ended (far end hung up, etc.) while it was in flight, cleanup
+      // already cancelled notification 8888 by the time we get here. Without
+      // this check, .show() below would silently recreate it right after
+      // cancellation, leaving a stale "ongoing call" notification behind
+      // even though the call is over.
+      if (callState.value != callStateConnected) return;
 
       final androidDetails = fln.AndroidNotificationDetails(
         'active_call_channel_medium_v1',
@@ -994,7 +1050,7 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
         details,
       );
     } catch (e) {
-      print('LiveKitService: Error showing ongoing call notification: $e');
+      logCall('LiveKitService: Error showing ongoing call notification: $e');
     }
   }
 
@@ -1007,6 +1063,17 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
   }
 
   void _onCallConnected() {
+    // Defensive reset, not relied on for correctness elsewhere: if a
+    // previous call's PiP transition didn't clean up perfectly and left
+    // this stuck true, it would otherwise silently suppress
+    // FloatingCallOverlay for this entire new call too (that overlay
+    // deliberately hides itself while isInNativePip is true, so as not to
+    // duplicate ActiveCallView's own PiP-specific layout). Every fresh
+    // connected call should start from a known-clean PiP state; the real
+    // native onPipModeChanged listener remains the source of truth once
+    // the call is actually running.
+    isInNativePip.value = false;
+
     CallKitService().endAllCalls();
     PipService().setCallActive(true);
     _startDurationTimer();
@@ -1091,7 +1158,17 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
   }
 
   void _cleanupAndPop() {
+    // Timed rather than left implicit — this is the "end call -> cleanup
+    // actually terminates" interval from the performance audit. Logged
+    // async since the WebRTC teardown itself is intentionally fire-and-
+    // forget from a post-frame callback (kept that way to avoid blocking
+    // the main thread / causing the black-screen-on-hangup bug fixed
+    // earlier) — this only adds a timestamp on top of that, not an await.
+    final endCallStartedAt = DateTime.now();
+
     _cancelOngoingCallNotification();
+    _ongoingCallIconBitmap = null;
+    _ongoingCallIconForUrl = null;
     CallKitService().endIncomingCall(currentRoomId.value ?? '');
     PipService().setCallActive(false);
     _clearActiveCallMarker();
@@ -1103,13 +1180,28 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
     _callDurationTimer = null;
     callDurationSeconds.value = 0;
 
-    // Safely exit call screens and return to main app view — prevents _history.isNotEmpty assertion errors
+    // Safely exit call screens and return to wherever the user actually was
+    // (chat, feed, wherever) — prevents _history.isNotEmpty assertion errors.
+    // Previously this always did Get.offAllNamed('/'), which discards the
+    // *entire* navigation stack and forces MainLayout/FeedController to
+    // rebuild from scratch even when the call was answered from, say, the
+    // middle of a chat screen — visible to the user as the app "reloading"
+    // right after declining/ending a call. Popping just the call screen(s)
+    // off the stack (when there's something underneath to reveal) fixes
+    // that; offAllNamed stays as the fallback for when the call screen was
+    // the only thing on the stack (e.g. cold-start accept from a killed app).
     try {
-      if (Get.currentRoute == '/incoming-call' || Get.currentRoute == '/active-call') {
-        Get.offAllNamed('/');
+      final route = Get.currentRoute;
+      if (route == '/incoming-call' || route == '/active-call') {
+        final canPop = Get.key.currentState?.canPop() ?? false;
+        if (canPop) {
+          Get.until((r) => r.settings.name != '/incoming-call' && r.settings.name != '/active-call');
+        } else {
+          Get.offAllNamed('/');
+        }
       }
     } catch (e) {
-      print('LiveKitService: Navigation pop error: $e');
+      logCall('LiveKitService: Navigation pop error: $e');
     }
 
     // Dispose WebRTC room and tracks on next frame to prevent black screen and main thread freeze
@@ -1117,7 +1209,10 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
       try {
         WakelockPlus.disable();
       } catch (_) {}
-      room?.disconnect();
+      room?.disconnect().then((_) {
+        logCall('LiveKitService: end call -> cleanup complete took '
+            '${DateTime.now().difference(endCallStartedAt).inMilliseconds}ms');
+      });
       room = null;
       localVideoTrack.value = null;
       remoteVideoTrack.value = null;

@@ -13,6 +13,7 @@ import android.graphics.drawable.Icon
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import android.util.Log
 import android.util.Rational
 import androidx.core.content.ContextCompat
 import io.flutter.embedding.android.FlutterActivity
@@ -154,13 +155,38 @@ class MainActivity : FlutterActivity() {
         super.onUserLeaveHint()
         // Only auto-enter PiP if a call is active AND user was actively interacting with the app (has window focus)
         // This prevents PiP from launching during background-to-foreground transition when accepting from notification.
-        if (isCallActive && isPipSupported() && hasWindowFocus()) {
+        val willEnter = isCallActive && isPipSupported() && hasWindowFocus()
+        Log.d("LivePoisedPip", "onUserLeaveHint: isCallActive=$isCallActive hasWindowFocus=${hasWindowFocus()} -> willEnterPip=$willEnter")
+        if (willEnter) {
             enterPip()
         }
     }
 
     override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        Log.d("LivePoisedPip", "onPictureInPictureModeChanged: isInPictureInPictureMode=$isInPictureInPictureMode")
+        run {
+            // invalidate()/requestLayout() alone (the previous attempt here)
+            // only asks Android to repaint the EXISTING SurfaceView surface —
+            // confirmed via live device logs that this callback does fire
+            // correctly on both directions, but the black screen persisted
+            // anyway, meaning the surface itself (not just its last-painted
+            // frame) is going stale across the PiP resize. Briefly toggling
+            // the decor view's visibility forces Android to fully tear down
+            // and recreate the surface on the next layout pass instead of
+            // just repainting whatever the old one had — a stronger, widely
+            // reported-working fix for this exact Flutter-PiP class of bug.
+            // Doesn't touch which rendering surface Flutter uses (TextureView
+            // was tried earlier and reverted: it fixes this but breaks
+            // MediaProjection screen-capture, an unacceptable trade).
+            val decorView = window.decorView
+            decorView.visibility = android.view.View.GONE
+            decorView.post {
+                decorView.visibility = android.view.View.VISIBLE
+                decorView.invalidate()
+                decorView.requestLayout()
+            }
+        }
         methodChannel?.invokeMethod("onPipModeChanged", isInPictureInPictureMode)
     }
 }
