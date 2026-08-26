@@ -151,6 +151,25 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
 
   String? get _currentUsername => _auth.userProfile.value?.username;
 
+  /// Waits (up to 6s) until AuthController knows whether this device is
+  /// logged in. `/active-call` is registered with `AuthMiddleware`, which
+  /// reads `isLoggedIn.value` synchronously the instant a navigation to it
+  /// resolves — on a killed-app cold start (accepting a call, or "call
+  /// back"), that navigation can fire before AuthController.checkAuthStatus()
+  /// has finished its own async token-refresh call, so `isLoggedIn` is still
+  /// `false` at that exact moment. The middleware then silently swaps the
+  /// destination for '/login' instead of throwing — the call still connects
+  /// underneath, but the UI gets stuck cycling through login/home and never
+  /// actually shows the active-call screen. Waiting here (before navigating,
+  /// not inside the middleware) fixes it at the source; already-logged-in
+  /// callers (the common case) return immediately.
+  Future<void> _waitForAuthReady() async {
+    for (int i = 0; i < 60; i++) {
+      if (_auth.isLoggedIn.value || _auth.isAuthChecked.value) return;
+      await Future.delayed(const Duration(milliseconds: 100));
+    }
+  }
+
   @override
   void onInit() {
     super.onInit();
@@ -265,12 +284,7 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
 
         if (remoteUserProfileImage.value == null || remoteUserProfileImage.value!.isEmpty) {
           if (profileImg != null && profileImg.toString().isNotEmpty) {
-            String url = profileImg.toString().trim();
-            if (!url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('data:image')) {
-              if (url.startsWith('/')) url = url.substring(1);
-              url = 'https://s3.ap-south-1.amazonaws.com/livepoised/$url';
-            }
-            remoteUserProfileImage.value = url;
+            remoteUserProfileImage.value = ApiEndpoints.resolveImageUrl(profileImg.toString());
           }
         }
       }
@@ -461,18 +475,35 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
     final nameStr = userProf?.name ?? "${userProf?.givenName ?? ''} ${userProf?.familyName ?? ''}".trim();
     localUserFullName.value = nameStr.isNotEmpty ? nameStr : (_currentUsername ?? 'User');
 
-    _ws.sendRaw({
-      'type': 'call:incoming',
-      'roomId': roomId,
-      'receiver': targetUsername,
-      'sender': _currentUsername,
-      'isVideo': withVideo,
-      'senderImage': localUserProfileImage.value,
-      'senderFullName': localUserFullName.value,
-    });
+    // Same fire-and-forget ensureConnected() pattern as acceptCall(): a
+    // "call back" from a killed-app cold start (tapping Call Back on a
+    // missed-call notification) can reach here before ChatWebSocketService
+    // has connected, which would otherwise silently drop this signal and
+    // leave the callee's device never ringing.
+    () async {
+      final connected = await _ws.ensureConnected();
+      if (connected) {
+        _ws.sendRaw({
+          'type': 'call:incoming',
+          'roomId': roomId,
+          'receiver': targetUsername,
+          'sender': _currentUsername,
+          'isVideo': withVideo,
+          'senderImage': localUserProfileImage.value,
+          'senderFullName': localUserFullName.value,
+        });
+      } else {
+        print('LiveKitService: Could not deliver call:incoming — WebSocket never connected');
+      }
+    }();
 
     _startRingingTimer();
 
+    // See acceptCall()'s identical wait: '/active-call' is behind
+    // AuthMiddleware, which redirects to '/login' if isLoggedIn is still
+    // false at the moment of navigation — a real risk on a killed-app
+    // cold-start "call back" before checkAuthStatus() has finished.
+    await _waitForAuthReady();
     Get.toNamed('/active-call');
 
     try {
@@ -506,6 +537,14 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
     final caller = callerUsername.value;
     if (roomId == null || caller == null) return;
 
+    // Guards against double-accept: on a killed-app cold start, both the
+    // `pending_call_action` marker (consumed by InitialBinding) and the
+    // native `acceptCallHandle` callback can independently try to accept
+    // the same call — whichever fires first wins, the other is a no-op.
+    if (callState.value == callStateConnected || callState.value == callStateCalling) {
+      return;
+    }
+
     _cancelRingingTimer();
 
     final hasPermissions = await _requestPermissions(withVideo: incomingIsVideo.value);
@@ -523,13 +562,30 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
       WakelockPlus.enable();
     } catch (_) {}
 
-    _ws.sendRaw({
-      'type': 'call:accept',
-      'roomId': roomId,
-      'receiver': caller,
-      'sender': _currentUsername,
-    });
+    // Fire-and-forget: on a killed-app cold start this can run before
+    // ChatWebSocketService has connected (it only dials once
+    // AuthController.checkAuthStatus() finishes, which is slower than this
+    // accept path). sendRaw() alone would silently drop the frame, leaving
+    // the caller's device stuck showing "Calling..." forever even though
+    // this device already joined the room — ensureConnected() waits for
+    // that connection instead. Not awaited here so it can't delay the
+    // navigation below; the already-connected case (the common path)
+    // resolves effectively instantly anyway.
+    () async {
+      final connected = await _ws.ensureConnected();
+      if (connected) {
+        _ws.sendRaw({
+          'type': 'call:accept',
+          'roomId': roomId,
+          'receiver': caller,
+          'sender': _currentUsername,
+        });
+      } else {
+        print('LiveKitService: Could not deliver call:accept — WebSocket never connected');
+      }
+    }();
 
+    await _waitForAuthReady();
     Get.offNamed('/active-call');
 
     try {
@@ -776,6 +832,17 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
     final newState = !isScreenSharing.value;
     try {
       if (newState) {
+        // Android 14 requires an active mediaProjection-type foreground
+        // service to already be running before MediaProjection capture
+        // starts, or the OS throws a SecurityException at the native layer
+        // that kills the whole app process — uncatchable here since it
+        // doesn't propagate back through this Future. Must be awaited
+        // before setScreenShareEnabled(true), not fired in parallel.
+        final serviceStarted = await PipService().startScreenShareService();
+        if (!serviceStarted) {
+          throw Exception('Could not start screen-share foreground service');
+        }
+
         isMinimized.value = true;
         if (Get.currentRoute == '/active-call') {
           Get.back();
@@ -783,10 +850,14 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
       }
       await room!.localParticipant?.setScreenShareEnabled(newState);
       isScreenSharing.value = newState;
+      if (!newState) {
+        await PipService().stopScreenShareService();
+      }
     } catch (e) {
       print('Screen share permission error: $e');
       isScreenSharing.value = false;
       isMinimized.value = false;
+      await PipService().stopScreenShareService();
       Get.snackbar(
         'Screen Share',
         'Screen capture permission was not granted.',
@@ -901,7 +972,8 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
         ongoing: true,
         autoCancel: false,
         showWhen: true,
-        icon: '@mipmap/ic_launcher',
+        icon: '@mipmap/ic_launcher_monochrome',
+        color: const Color(0xFF0F766E),
         largeIcon: largeIconBitmap,
         actions: const [
           fln.AndroidNotificationAction(
@@ -939,6 +1011,54 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
     PipService().setCallActive(true);
     _startDurationTimer();
     _maybePromptPipPermission();
+    _persistActiveCallMarker();
+  }
+
+  static const String _activeCallMarkerKey = 'active_call_marker';
+
+  /// Lets a fresh app launch (after a crash or being killed mid-call) detect
+  /// there was a call in progress and rejoin it, instead of just landing on
+  /// the home screen with no memory the call ever happened. Consumed by
+  /// InitialBinding._consumeActiveCallMarker.
+  void _persistActiveCallMarker() {
+    if (!Get.isRegistered<GetStorage>()) return;
+    final roomId = currentRoomId.value;
+    final peer = callerUsername.value;
+    if (roomId == null || peer == null) return;
+    Get.find<GetStorage>().write(_activeCallMarkerKey, {
+      'roomId': roomId,
+      'peer': peer,
+      'isVideo': incomingIsVideo.value,
+      'peerName': remoteUserFullName.value,
+      'peerImage': remoteUserProfileImage.value,
+      'connectedAt': DateTime.now().toIso8601String(),
+    });
+  }
+
+  void _clearActiveCallMarker() {
+    if (Get.isRegistered<GetStorage>()) {
+      Get.find<GetStorage>().remove(_activeCallMarkerKey);
+    }
+  }
+
+  /// Rejoins a call that was connected before the app was killed/crashed —
+  /// fetches a fresh LiveKit token and reconnects to the same room, same as
+  /// a normal accept. If the room/other party is gone, this fails gracefully
+  /// the same way any other failed connect attempt does.
+  Future<void> resumeActiveCall({
+    required String roomId,
+    required String peer,
+    required bool isVideo,
+    String? peerName,
+    String? peerImage,
+  }) async {
+    if (callState.value == callStateConnected || callState.value == callStateCalling) return;
+    currentRoomId.value = roomId;
+    callerUsername.value = peer;
+    incomingIsVideo.value = isVideo;
+    if (peerName != null && peerName.isNotEmpty) remoteUserFullName.value = peerName;
+    if (peerImage != null && peerImage.isNotEmpty) remoteUserProfileImage.value = peerImage;
+    await acceptCall();
   }
 
   static const String _pipPromptShownKey = 'pip_permission_prompt_shown';
@@ -974,6 +1094,11 @@ class LiveKitService extends GetxService with WidgetsBindingObserver {
     _cancelOngoingCallNotification();
     CallKitService().endIncomingCall(currentRoomId.value ?? '');
     PipService().setCallActive(false);
+    _clearActiveCallMarker();
+    if (isScreenSharing.value) {
+      isScreenSharing.value = false;
+      PipService().stopScreenShareService();
+    }
     _callDurationTimer?.cancel();
     _callDurationTimer = null;
     callDurationSeconds.value = 0;

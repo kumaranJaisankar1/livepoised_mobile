@@ -24,11 +24,21 @@
         android:label="Live Poised"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <!-- Was "com.cloudwebrtc.webrtc.FlutterForegroundService" — that class
+             doesn't exist in flutter_webrtc 1.6.0 (the version livekit_client
+             pins); confirmed via source inspection there's no such file and
+             no startForeground call anywhere in the plugin. Dangling
+             reference from an older flutter_webrtc setup. Replaced with our
+             own service (ScreenShareForegroundService.kt) that actually
+             starts before screen capture begins — Android 14 requires an
+             active mediaProjection-type foreground service to already be
+             running before MediaProjection capture starts, or it throws a
+             SecurityException that kills the whole process. -->
         <service
-            android:name="com.cloudwebrtc.webrtc.FlutterForegroundService"
+            android:name=".ScreenShareForegroundService"
             android:enabled="true"
             android:exported="false"
-            android:foregroundServiceType="mediaProjection|microphone|camera" />
+            android:foregroundServiceType="mediaProjection" />
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -47,6 +57,16 @@
               android:name="io.flutter.embedding.android.NormalTheme"
               android:resource="@style/NormalTheme"
               />
+            <!-- REVERTED: forcing TextureView (EnableSurfaceView=false) was an
+                 attempted fix for a PiP black-screen cosmetic issue, but
+                 TextureView is documented to conflict with MediaProjection's
+                 VirtualDisplay-based screen capture on several Android
+                 versions/OEMs — confirmed to be the cause of a real crash
+                 whenever screen sharing was started. A crash on a working
+                 feature is worse than an unconfirmed cosmetic PiP fix, so
+                 this reverts to the default SurfaceView. If PiP's black
+                 screen needs revisiting, it needs a fix that doesn't touch
+                 this global rendering-surface setting. -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>

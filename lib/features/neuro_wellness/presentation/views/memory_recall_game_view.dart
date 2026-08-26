@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'dart:async';
 import 'dart:math';
+import '../../data/models/game_session.dart';
+import '../controllers/neuro_wellness_controller.dart';
+import '../widgets/game_result_dialog.dart';
 
 class MemoryRecallGameView extends StatefulWidget {
   const MemoryRecallGameView({super.key});
@@ -23,6 +26,7 @@ class _MemoryRecallGameViewState extends State<MemoryRecallGameView> {
   int level = 1;
   int remainingSeconds = 10;
   Timer? _memorizationTimer;
+  final DateTime _sessionStart = DateTime.now();
 
   @override
   void initState() {
@@ -105,21 +109,30 @@ class _MemoryRecallGameViewState extends State<MemoryRecallGameView> {
     });
   }
 
+  void _recordSession() {
+    if (Get.isRegistered<NeuroWellnessController>()) {
+      Get.find<NeuroWellnessController>().recordSession(GameSession(
+        gameId: 'memory_recall',
+        score: (level * 10).clamp(0, 100),
+        durationSeconds: DateTime.now().difference(_sessionStart).inSeconds,
+        completedAt: DateTime.now(),
+      ));
+    }
+  }
+
   void _showGameOverDialog() {
-    Get.defaultDialog(
+    _recordSession();
+    GameResultDialog.show(
+      icon: Icons.psychology_outlined,
+      accentColor: Colors.blue,
       title: "Recalibration Incomplete",
-      middleText: "You reached Level $level. Daily practice clears the fog!",
-      textConfirm: "Try Again",
-      confirmTextColor: Colors.white,
-      onConfirm: () {
-        Get.back();
+      message: "You reached Level $level. Daily practice clears the fog!",
+      onTryAgain: () {
         setState(() {
           level = 1;
           _startNewLevel();
         });
       },
-      textCancel: "Lobby",
-      onCancel: () => Get.back(closeOverlays: true),
     );
   }
 

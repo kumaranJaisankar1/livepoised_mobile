@@ -13,6 +13,7 @@ import '../../features/call/data/livekit_service.dart';
 import '../../features/notification/data/services/notification_service.dart';
 import '../../features/chat/data/models/inbox_item.dart';
 import '../../features/chat/presentation/controllers/chat_controller.dart';
+import '../constants/api_endpoints.dart';
 import 'callkit_service.dart';
 
 @pragma('vm:entry-point')
@@ -39,7 +40,12 @@ Future<void> notificationTapBackground(NotificationResponse response) async {
         final isVideo = data['isVideo'] == 'true' || data['isVideo'] == true;
         if (sender != null && sender.isNotEmpty) {
           if (Get.isRegistered<LiveKitService>()) {
-            Get.find<LiveKitService>().startCall(sender, withVideo: isVideo);
+            Get.find<LiveKitService>().startCall(
+              sender,
+              withVideo: isVideo,
+              targetName: data['senderFullName'] as String?,
+              targetImage: data['senderImage'] as String?,
+            );
           } else {
             await GetStorage.init();
             final box = GetStorage();
@@ -73,6 +79,111 @@ Future<void> notificationTapBackground(NotificationResponse response) async {
     } catch (e) {
       print('PNS Error in background chat notification tap: $e');
     }
+  }
+}
+
+/// Shared `onDidReceiveNotificationResponse` handler — the ONE place that
+/// decides what a tapped notification action does while the app process is
+/// alive. `flutter_local_notifications.initialize()` unconditionally
+/// overwrites its previously-registered callback on every call (it's a
+/// single shared native plugin instance backing every Dart-side
+/// `FlutterLocalNotificationsPlugin()` object, confirmed by reading the
+/// package source — `_onDidReceiveNotificationResponse = onDidReceive...`
+/// with no null-check). Every `.initialize()` call in this file MUST pass
+/// this exact function, or whichever one runs last silently disables
+/// actions (like End Call) registered by an earlier call — this was a real,
+/// confirmed bug: a chat/missed-call notification arriving mid-call could
+/// clobber the End Call handler for the rest of the session.
+void handleNotificationResponse(NotificationResponse response) {
+  if (response.actionId == 'end_call_action') {
+    try {
+      final localNotifications = FlutterLocalNotificationsPlugin();
+      localNotifications.cancel(8888);
+      localNotifications.cancel(9999);
+    } catch (_) {}
+    CallKitService().endAllCalls();
+    if (Get.isRegistered<LiveKitService>()) {
+      Get.find<LiveKitService>().endCall();
+    } else {
+      GetStorage().write('pending_call_action', {'action': 'end'});
+    }
+    return;
+  } else if (response.actionId == 'call_back') {
+    if (response.payload != null) {
+      try {
+        final Map<String, dynamic> data = jsonDecode(response.payload!);
+        final sender = data['sender'] as String?;
+        final isVideo = data['isVideo'] == 'true' || data['isVideo'] == true;
+        if (sender != null && sender.isNotEmpty) {
+          if (Get.isRegistered<LiveKitService>()) {
+            Get.find<LiveKitService>().startCall(
+              sender,
+              withVideo: isVideo,
+              targetName: data['senderFullName'] as String?,
+              targetImage: data['senderImage'] as String?,
+            );
+          } else {
+            // Cold start: this callback can fire before InitialBinding has
+            // registered LiveKitService (same race Accept/End Call already
+            // guard against). Persist the intent so InitialBinding starts
+            // the call once GetX/the Navigator are actually ready, instead
+            // of calling startCall()/Get.toNamed() too early.
+            GetStorage().write('pending_call_action', {
+              'action': 'start',
+              'targetUsername': sender,
+              'isVideo': isVideo,
+              'senderFullName': data['senderFullName'],
+              'senderImage': data['senderImage'],
+            });
+          }
+        }
+      } catch (_) {}
+    }
+  } else if (response.payload != null) {
+    try {
+      final Map<String, dynamic> data = jsonDecode(response.payload!);
+      if (Get.isRegistered<LiveKitService>()) {
+        PushNotificationService.handleNavigation(data);
+      } else {
+        // Cold start: handleNavigation's CHAT/MISSED_CALL/ALLY_REQUEST/
+        // CAREGIVER_REQUEST branches call Get.toNamed/Get.offNamed directly,
+        // which is the same class of race already fixed for call_back/
+        // end_call_action above — the Navigator isn't attached yet if the
+        // process was fully killed. INCOMING_CALL is safe without GetX
+        // (CallKitService.showIncomingCall doesn't need it), so it's handled
+        // directly; everything else is deferred via the pending-action
+        // marker InitialBinding consumes once GetX/the Navigator are ready.
+        final String? type = data['type'];
+        switch (type) {
+          case 'INCOMING_CALL':
+          case 'call:incoming':
+            PushNotificationService.handleNavigation(data);
+            break;
+          case 'CHAT_MESSAGE':
+          case 'CHAT':
+          case 'chat':
+          case 'MISSED_CALL':
+          case 'missed_call':
+            final sender = (data['sender'] ?? data['senderUsername'] ?? data['otherUsername'] ?? data['referenceId'])?.toString();
+            if (sender != null && sender.isNotEmpty) {
+              GetStorage().write('pending_call_action', {
+                'action': 'open_chat',
+                'targetUsername': sender,
+                'senderFullName': data['senderFullName'],
+                'senderImage': data['senderImage'],
+              });
+            }
+            break;
+          case 'ALLY_REQUEST':
+          case 'CAREGIVER_REQUEST':
+            GetStorage().write('pending_call_action', {'action': 'open_network'});
+            break;
+          case 'NEURO_REMINDER':
+            GetStorage().write('pending_call_action', {'action': 'open_neuro_wellness'});
+            break;
+        }
+      }
+    } catch (_) {}
   }
 }
 
@@ -117,23 +228,15 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
   if (type == 'INCOMING_CALL' || type == 'call:incoming') {
     final roomId = message.data['roomId']?.toString() ?? '';
-    String? senderImage = message.data['senderImage']?.toString();
-    if (senderImage != null && senderImage.trim().isNotEmpty && !senderImage.startsWith('data:image')) {
-      String url = senderImage.trim();
-      if (!url.startsWith('http://') && !url.startsWith('https://')) {
-        if (url.startsWith('/')) url = url.substring(1);
-        url = 'https://s3.ap-south-1.amazonaws.com/livepoised/$url';
-      }
-      senderImage = url;
-    }
-
+    // showIncomingCall resolves the S3 path / decodes base64 itself now —
+    // pass the raw value straight through rather than duplicating that logic.
     await CallKitService().showIncomingCall(
       id: roomId,
       roomId: roomId,
       sender: message.data['sender']?.toString() ?? '',
       senderFullName: message.data['senderFullName']?.toString() ?? message.data['sender']?.toString() ?? 'Incoming Call',
       isVideo: message.data['isVideo'] == 'true' || message.data['isVideo'] == true,
-      senderImage: senderImage,
+      senderImage: message.data['senderImage']?.toString(),
     );
     return;
   }
@@ -155,11 +258,7 @@ class PushNotificationService {
   static Future<ByteArrayAndroidBitmap?> getLargeIcon(String? imageUrl, String senderName) async {
     if (imageUrl != null && imageUrl.trim().isNotEmpty) {
       try {
-        String url = imageUrl.trim();
-        if (!url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('data:image')) {
-          if (url.startsWith('/')) url = url.substring(1);
-          url = 'https://s3.ap-south-1.amazonaws.com/livepoised/$url';
-        }
+        final url = ApiEndpoints.resolveImageUrl(imageUrl);
 
         Uint8List? rawBytes;
         if (url.startsWith('http://') || url.startsWith('https://')) {
@@ -270,9 +369,16 @@ class PushNotificationService {
 
   static Future<void> showMissedCallNotification(Map<String, dynamic> data) async {
     final localNotifications = FlutterLocalNotificationsPlugin();
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher_monochrome');
     const initSettings = InitializationSettings(android: androidSettings);
-    await localNotifications.initialize(initSettings);
+    // Must always pass the full shared handler here (never a bare/no-handler
+    // initialize()) — this can run in the same isolate as the main app (see
+    // handleNotificationResponse's doc comment for why that matters).
+    await localNotifications.initialize(
+      initSettings,
+      onDidReceiveNotificationResponse: handleNotificationResponse,
+      onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
+    );
 
     // 1. DISMISS INCOMING CALL BANNER (ID 9999) IMMEDIATELY!
     try {
@@ -313,7 +419,14 @@ class PushNotificationService {
           showsUserInterface: true,
         ),
       ],
-      icon: '@mipmap/ic_launcher',
+      // Android forces every status-bar icon into a flat silhouette from its
+      // alpha channel, discarding color — using the full launcher icon here
+      // renders as a solid blob. ic_launcher_monochrome is the proper
+      // pre-made silhouette asset (Android 13+ themed-icon format) for
+      // exactly this slot. `color` tints it (and the notification header)
+      // with the brand teal — the closest thing to "color" this slot allows.
+      icon: '@mipmap/ic_launcher_monochrome',
+      color: const Color(0xFF0F766E),
     );
 
     await localNotifications.show(
@@ -375,7 +488,7 @@ class PushNotificationService {
     // action and general (non-call) notification navigation.)
     try {
       const AndroidInitializationSettings androidSettings =
-          AndroidInitializationSettings('@mipmap/ic_launcher');
+          AndroidInitializationSettings('@mipmap/ic_launcher_monochrome');
       const DarwinInitializationSettings iosSettings = DarwinInitializationSettings(
         requestAlertPermission: false,
         requestBadgePermission: false,
@@ -390,38 +503,7 @@ class PushNotificationService {
       print('PNS: Initializing local notifications...');
       await _localNotifications.initialize(
         initSettings,
-        onDidReceiveNotificationResponse: (NotificationResponse response) {
-          if (response.actionId == 'end_call_action') {
-            try {
-              final localNotifications = FlutterLocalNotificationsPlugin();
-              localNotifications.cancel(8888);
-              localNotifications.cancel(9999);
-            } catch (_) {}
-            CallKitService().endAllCalls();
-            if (Get.isRegistered<LiveKitService>()) {
-              Get.find<LiveKitService>().endCall();
-            } else {
-              GetStorage().write('pending_call_action', {'action': 'end'});
-            }
-            return;
-          } else if (response.actionId == 'call_back') {
-            if (response.payload != null) {
-              try {
-                final Map<String, dynamic> data = jsonDecode(response.payload!);
-                final sender = data['sender'] as String?;
-                final isVideo = data['isVideo'] == 'true' || data['isVideo'] == true;
-                if (sender != null && Get.isRegistered<LiveKitService>()) {
-                  Get.find<LiveKitService>().startCall(sender, withVideo: isVideo);
-                }
-              } catch (_) {}
-            }
-          } else if (response.payload != null) {
-            try {
-              final Map<String, dynamic> data = jsonDecode(response.payload!);
-              handleNavigation(data);
-            } catch (_) {}
-          }
-        },
+        onDidReceiveNotificationResponse: handleNotificationResponse,
         onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
       );
     } catch (e) {
@@ -496,78 +578,6 @@ class PushNotificationService {
     }
     
     print('PNS: Initialization complete');
-  }
-
-  Future<void> showCallNotification({
-    required String roomId,
-    required String sender,
-    required String senderFullName,
-    required bool isVideo,
-    String? senderImage,
-  }) async {
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const initSettings = InitializationSettings(android: androidSettings);
-    await _localNotifications.initialize(initSettings);
-
-    final largeIcon = await getLargeIcon(senderImage, senderFullName);
-
-    final androidDetails = AndroidNotificationDetails(
-      'incoming_call_v3_channel',
-      'Incoming Call Notifications',
-      channelDescription: 'Ringing incoming call notification banner with action buttons',
-      importance: Importance.max,
-      priority: Priority.max,
-      category: AndroidNotificationCategory.call,
-      fullScreenIntent: true,
-      playSound: true,
-      ongoing: true,
-      autoCancel: false,
-      visibility: NotificationVisibility.public,
-      audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
-      largeIcon: largeIcon,
-      actions: const [
-        AndroidNotificationAction(
-          'decline_call',
-          'Decline',
-          titleColor: Color(0xFFEF4444),
-          showsUserInterface: false,
-          cancelNotification: true,
-        ),
-        AndroidNotificationAction(
-          'accept_call',
-          'Accept',
-          titleColor: Color(0xFF10B981),
-          showsUserInterface: true,
-        ),
-      ],
-      icon: '@mipmap/ic_launcher',
-    );
-
-    final details = NotificationDetails(
-      android: androidDetails,
-      iOS: DarwinNotificationDetails(
-        categoryIdentifier: 'incoming_call',
-        presentSound: true,
-      ),
-    );
-
-    final payload = jsonEncode({
-      'type': 'INCOMING_CALL',
-      'roomId': roomId,
-      'sender': sender,
-      'senderFullName': senderFullName,
-      'isVideo': isVideo,
-      'senderImage': senderImage,
-    });
-
-    print('PNS: Showing local call notification for $senderFullName ($roomId)');
-    await _localNotifications.show(
-      9999,
-      senderFullName.isNotEmpty ? senderFullName : sender,
-      'Incoming ${isVideo ? "Video" : "Voice"} Call',
-      details,
-      payload: payload,
-    );
   }
 
   void _showLocalNotification(RemoteNotification notification, Map<String, dynamic> data) {
@@ -646,6 +656,9 @@ class PushNotificationService {
       case 'CAREGIVER_REQUEST':
         Get.toNamed('/network');
         break;
+      case 'NEURO_REMINDER':
+        Get.toNamed('/neuro-wellness');
+        break;
       default:
         print('Unknown notification type: $type');
         break;
@@ -678,19 +691,12 @@ class PushNotificationService {
     }
 
     final localNotifications = FlutterLocalNotificationsPlugin();
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher_monochrome');
     const initSettings = InitializationSettings(android: androidSettings);
 
     await localNotifications.initialize(
       initSettings,
-      onDidReceiveNotificationResponse: (NotificationResponse response) {
-        if (response.payload != null) {
-          try {
-            final Map<String, dynamic> data = jsonDecode(response.payload!);
-            PushNotificationService.handleNavigation(data);
-          } catch (_) {}
-        }
-      },
+      onDidReceiveNotificationResponse: handleNotificationResponse,
       onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
     );
 
@@ -712,7 +718,8 @@ class PushNotificationService {
       priority: Priority.high,
       category: AndroidNotificationCategory.message,
       largeIcon: largeIcon,
-      icon: '@mipmap/ic_launcher',
+      icon: '@mipmap/ic_launcher_monochrome',
+      color: const Color(0xFF0F766E),
     );
 
     await localNotifications.show(

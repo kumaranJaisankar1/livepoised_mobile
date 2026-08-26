@@ -14,6 +14,7 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import android.util.Rational
+import androidx.core.content.ContextCompat
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -43,6 +44,21 @@ class MainActivity : FlutterActivity() {
                 }
                 "enterPip" -> {
                     result.success(enterPip())
+                }
+                "startScreenShareService" -> {
+                    try {
+                        ContextCompat.startForegroundService(
+                            this,
+                            Intent(this, ScreenShareForegroundService::class.java)
+                        )
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.success(false)
+                    }
+                }
+                "stopScreenShareService" -> {
+                    stopService(Intent(this, ScreenShareForegroundService::class.java))
+                    result.success(null)
                 }
                 else -> result.notImplemented()
             }

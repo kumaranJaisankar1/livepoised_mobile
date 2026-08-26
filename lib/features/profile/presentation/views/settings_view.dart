@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../../core/theme/theme_controller.dart';
+import '../../../neuro_wellness/presentation/widgets/neuro_reminder_tile.dart';
 import '../../../notification/presentation/controllers/notification_controller.dart';
 
 class SettingsView extends StatelessWidget {
@@ -42,6 +43,9 @@ class SettingsView extends StatelessWidget {
                 activeColor: theme.colorScheme.primary,
                 onChanged: (val) => notificationController.toggleNotifications(val),
               )),
+          const Divider(),
+          _buildSectionHeader(context, 'Neuro Wellness'),
+          const NeuroReminderTile(),
           const Divider(),
           _buildSectionHeader(context, 'Privacy'),
           _buildSettingTile(

@@ -15,7 +15,12 @@ class FloatingCallOverlay extends StatelessWidget {
       final currentRoute = Get.currentRoute;
       final isMinimized = lk.isMinimized.value || (isConnected && currentRoute != '/active-call');
 
-      if (!isConnected || !isMinimized) {
+      // Real OS-level PiP shrinks the whole Activity window down to a tiny
+      // rect — this bar is sized for full in-app width and overflows badly
+      // when squeezed into that. ActiveCallView already has its own
+      // dedicated narrow layout for native PiP, so this would just be a
+      // second, redundant, broken UI fighting for the same space.
+      if (!isConnected || !isMinimized || lk.isInNativePip.value) {
         return const SizedBox.shrink();
       }
 

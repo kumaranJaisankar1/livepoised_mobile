@@ -123,6 +123,38 @@ class CallKitService {
       print('CallKitService: Failed to register background message handler: $e');
     }
 
+    if (Platform.isAndroid) {
+      try {
+        // Android's own dedicated mechanism for "app was fully killed, user
+        // tapped Accept": the native side waits ~750ms after the tap for
+        // *some* Flutter engine's method channel to exist (real app launch
+        // or the onBackgroundMessage headless engine, whichever is up),
+        // then invokes this. Registering it here — as part of the real
+        // app's own boot via InitialBinding — means it fires reliably once
+        // this engine is confirmed running, instead of racing the
+        // `pending_call_action` marker against InitialBinding's own
+        // consume-on-first-frame timing (that race was the actual cause of
+        // "tapping Accept from a killed app just opens the app instead of
+        // joining the call").
+        FlutterCallkitIncoming.acceptCallHandle((data) {
+          // The native side hands back the call's `extra` map directly here
+          // (roomId/sender/senderFullName/senderImage/isVideo) — not a full
+          // CallKitParams — so accept using that data straight, same as the
+          // onEvent listener's _onAccept does internally.
+          if (!Get.isRegistered<LiveKitService>()) return;
+          Get.find<LiveKitService>().acceptCallWithData(
+            roomId: data['roomId'] as String?,
+            caller: data['sender'] as String?,
+            isVideo: data['isVideo'] == true || data['isVideo'] == 'true',
+            callerFullName: data['senderFullName'] as String?,
+            callerImage: data['senderImage'] as String?,
+          );
+        });
+      } catch (e) {
+        print('CallKitService: Failed to register acceptCallHandle: $e');
+      }
+    }
+
     if (Platform.isIOS) {
       _registerVoipTokenIfAvailable();
     }
@@ -242,10 +274,41 @@ String stringToUuid(String input) {
     String? senderImage,
   }) async {
     final String uuid = stringToUuid(id.isNotEmpty ? id : roomId);
+
+    // FCM data messages aren't strictly exactly-once — a redelivery (e.g.
+    // triggered by the app briefly losing foreground focus for the Android
+    // screen-capture permission dialog during an active call) can re-invoke
+    // this for a call that's already ringing or connected. The WS-driven
+    // signal path already guards this via callState, but this method is
+    // also reached directly from the FCM background handler in a separate
+    // isolate where that Dart-side state isn't visible — so check the
+    // plugin's own native call registry instead, which is isolate-agnostic.
+    try {
+      final active = await FlutterCallkitIncoming.activeCalls();
+      if (active.any((call) => call.id == uuid)) {
+        print('CallKitService: showIncomingCall — ignoring duplicate/redelivered push for already-active call $uuid');
+        return;
+      }
+    } catch (_) {}
+
     String? safeAvatar;
-    if (senderImage != null && senderImage.trim().isNotEmpty && !senderImage.startsWith('data:image')) {
-      safeAvatar = await _downloadAndCacheAvatar(senderImage, uuid);
+    if (senderImage != null && senderImage.trim().isNotEmpty) {
+      if (senderImage.startsWith('data:image')) {
+        // The profile-image endpoint (Spring Boot `/images/getUserImage`)
+        // returns inline base64, not an S3 URL — CallKit's native Android
+        // loader (Coil) can only fetch real http(s) URLs or local files, not
+        // a `data:` URI, so it silently drops these. Decode once and hand it
+        // a real local file instead.
+        safeAvatar = await _writeBase64AvatarToFile(senderImage, uuid);
+      } else {
+        safeAvatar = _resolveAvatarUrl(senderImage);
+      }
     }
+    // Diagnostic: run `adb logcat | grep CallKitService` (or the Flutter run
+    // console) right when a call arrives to see exactly what was received vs
+    // resolved — narrows down "no image data sent" vs "URL fine, native-side
+    // load is failing" without more guessing from source alone.
+    print('CallKitService: showIncomingCall — raw senderImage length=${senderImage?.length ?? 0} -> resolved avatar="$safeAvatar"');
 
     final params = CallKitParams(
       id: uuid,
@@ -324,28 +387,38 @@ String stringToUuid(String input) {
     }
   }
 
-  static Future<String?> _downloadAndCacheAvatar(String imageUrl, String uuid) async {
-    try {
-      String url = imageUrl.trim();
-      if (!url.startsWith('http://') && !url.startsWith('https://')) {
-        if (url.startsWith('/')) url = url.substring(1);
-        url = 'https://s3.ap-south-1.amazonaws.com/livepoised/$url';
-      }
+  /// Resolves a possibly-relative stored image path into the full S3 URL —
+  /// mirrors the same resolution logic used everywhere else avatars are
+  /// shown (getLargeIcon in push_notification_service.dart, the ongoing-call
+  /// notification in livekit_service.dart). Passed straight through to the
+  /// plugin as `avatar` rather than pre-downloaded to a local file: the
+  /// Android side loads it via Coil (an HTTP-based image loader, confirmed
+  /// by reading ImageLoaderProvider.kt), which expects a proper `http(s)://`
+  /// URL string — a bare local filesystem path isn't reliably resolved by
+  /// Coil's string data source and silently falls back to the initials
+  /// placeholder, which was the actual bug here.
+  static String _resolveAvatarUrl(String imageUrl) => ApiEndpoints.resolveImageUrl(imageUrl);
 
-      final request = await HttpClient().getUrl(Uri.parse(url)).timeout(const Duration(seconds: 3));
-      final response = await request.close();
-      if (response.statusCode == 200) {
-        final bytes = await response.fold<List<int>>([], (acc, chunk) => acc..addAll(chunk));
-        if (bytes.isNotEmpty) {
-          final tempDir = Directory.systemTemp;
-          final file = File('${tempDir.path}/call_avatar_$uuid.png');
-          await file.writeAsBytes(bytes);
-          return file.path;
-        }
-      }
+  /// Decodes an inline `data:image/...;base64,...` string and writes it to
+  /// a local cache file, returning a `file://`-prefixed path. A bare
+  /// filesystem path (no scheme) isn't reliably resolved by Coil's string
+  /// data source (confirmed the hard way — same class of bug as the S3 URL
+  /// fix above); prefixing with `file://` is the unambiguous, standard way
+  /// to hand any Android media/image loader a local file by URI.
+  static Future<String?> _writeBase64AvatarToFile(String dataUri, String uuid) async {
+    try {
+      final commaIndex = dataUri.indexOf(',');
+      if (commaIndex == -1) return null;
+      final bytes = base64Decode(dataUri.substring(commaIndex + 1));
+      if (bytes.isEmpty) return null;
+
+      final tempDir = Directory.systemTemp;
+      final file = File('${tempDir.path}/call_avatar_$uuid.jpg');
+      await file.writeAsBytes(bytes);
+      return 'file://${file.path}';
     } catch (e) {
-      print('CallKitService: Error downloading avatar for CallKit: $e');
+      print('CallKitService: Failed to decode/write base64 avatar: $e');
+      return null;
     }
-    return imageUrl;
   }
 }

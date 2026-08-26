@@ -8,6 +8,24 @@ class ApiEndpoints {
   static String get realm => dotenv.get('KEYCLOAK_REALM');
   static String get clientId => dotenv.get('CLIENT_ID');
   
+  /// Resolves a possibly-relative stored image path (as returned by e.g.
+  /// chat/call signaling or a caller-profile fetch) into the full S3 URL.
+  /// Single source of truth for the bucket path — this exact snippet used
+  /// to be duplicated across push_notification_service.dart,
+  /// callkit_service.dart, and livekit_service.dart, which is real drift
+  /// risk if the bucket/region ever changes. Leaves `data:image` URIs and
+  /// already-absolute http(s) URLs untouched — callers handle those cases
+  /// themselves (e.g. decoding base64 for a notification's bitmap, or
+  /// writing it to a local file for CallKit's avatar).
+  static String resolveImageUrl(String path) {
+    final trimmed = path.trim();
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('data:image')) {
+      return trimmed;
+    }
+    final relative = trimmed.startsWith('/') ? trimmed.substring(1) : trimmed;
+    return 'https://s3.ap-south-1.amazonaws.com/livepoised/$relative';
+  }
+
   // Keycloak OIDC Endpoints
   static String get authEndpoint => '$keycloakUrl/realms/$realm/protocol/openid-connect/auth';
   static String get tokenEndpoint => '$keycloakUrl/realms/$realm/protocol/openid-connect/token';
@@ -103,5 +121,11 @@ class ApiEndpoints {
 
   // Redirect URI (Globally unique scheme, double slash format to bypass Intent drops)
   static const String redirectUri = 'com.livepoised.app://callback';
+
+  // News & Articles (Spring Boot)
+  static String get trendingNews => '$baseUrlSpringBoot/api/news/trending';
+
+  // Neuro Wellness session sync (FastAPI) — fire-and-forget, local GetStorage is the read path
+  static String get neuroWellnessSessions => '$baseUrlFastAPI/neuro-wellness/sessions';
 }
 

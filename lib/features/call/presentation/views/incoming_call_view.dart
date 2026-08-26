@@ -31,11 +31,25 @@ class IncomingCallView extends StatelessWidget {
           final callerPic = lk.remoteUserProfileImage.value;
           final isVideo = lk.incomingIsVideo.value;
 
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 40.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
+          // Scrollable + IntrinsicHeight instead of a bare Column: on a
+          // normal full-screen device this renders identically (the
+          // ConstrainedBox's minHeight fills the viewport, so
+          // spaceBetween still spreads the three sections exactly as
+          // before). But if the viewport is much shorter than usual — the
+          // real case being an Android system PiP window, which shrinks
+          // the whole Activity down to a tiny rect and renders whatever
+          // route happens to be on top of it — this scrolls instead of
+          // hard-overflowing with the debug warning stripes.
+          return LayoutBuilder(builder: (context, constraints) {
+            return SingleChildScrollView(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: IntrinsicHeight(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 40.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
                 // Top Header Info
                 Column(
                   children: [
@@ -152,7 +166,11 @@ class IncomingCallView extends StatelessWidget {
                 ),
               ],
             ),
-          );
+                  ),
+                ),
+              ),
+            );
+          });
         }),
       ),
     );

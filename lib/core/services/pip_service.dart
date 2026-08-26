@@ -73,4 +73,25 @@ class PipService {
       return false;
     }
   }
+
+  /// Must be called (and awaited) BEFORE starting screen capture — Android
+  /// 14 requires an active mediaProjection-type foreground service to
+  /// already be running before MediaProjection capture starts, or the OS
+  /// throws a SecurityException that kills the whole app process. See
+  /// ScreenShareForegroundService.kt for the native side.
+  Future<bool> startScreenShareService() async {
+    if (!Platform.isAndroid) return true;
+    try {
+      return await _channel.invokeMethod<bool>('startScreenShareService') ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> stopScreenShareService() async {
+    if (!Platform.isAndroid) return;
+    try {
+      await _channel.invokeMethod('stopScreenShareService');
+    } catch (_) {}
+  }
 }

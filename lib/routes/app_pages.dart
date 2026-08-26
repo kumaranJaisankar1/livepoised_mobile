@@ -29,8 +29,14 @@ import '../features/neuro_wellness/presentation/views/neuro_wellness_lobby_view.
 import '../features/neuro_wellness/presentation/controllers/neuro_wellness_controller.dart';
 import '../features/neuro_wellness/presentation/views/memory_recall_game_view.dart';
 import '../features/neuro_wellness/presentation/views/zen_flow_view.dart';
+import '../features/neuro_wellness/presentation/views/fog_clearer_game_view.dart';
+import '../features/neuro_wellness/presentation/views/number_match_game_view.dart';
+import '../features/neuro_wellness/presentation/views/reaction_time_game_view.dart';
 import '../features/call/presentation/views/incoming_call_view.dart';
 import '../features/call/presentation/views/active_call_view.dart';
+import '../features/news/presentation/controllers/news_controller.dart';
+import '../features/news/presentation/views/news_article_webview_view.dart';
+import '../features/news/presentation/views/news_list_view.dart';
 
 class AppPages {
   static const initial = '/splash';
@@ -71,7 +77,23 @@ class AppPages {
           Get.lazyPut(() => ChatListController(), fenix: true);
         }
         Get.lazyPut(() => NeuroWellnessController());
+        Get.lazyPut(() => NewsController());
       }),
+    ),
+    GetPage(
+      name: '/news',
+      page: () => const NewsListView(),
+      middlewares: [AuthMiddleware()],
+      binding: BindingsBuilder(() {
+        if (!Get.isRegistered<NewsController>()) {
+          Get.lazyPut(() => NewsController());
+        }
+      }),
+    ),
+    GetPage(
+      name: '/news-article',
+      page: () => const NewsArticleWebViewView(),
+      middlewares: [AuthMiddleware()],
     ),
     GetPage(
       name: '/create-post',
@@ -152,6 +174,21 @@ class AppPages {
     GetPage(
       name: '/neuro-wellness/zen-flow',
       page: () => const ZenFlowView(),
+      middlewares: [AuthMiddleware()],
+    ),
+    GetPage(
+      name: '/neuro-wellness/fog-clearer',
+      page: () => const FogClearerGameView(),
+      middlewares: [AuthMiddleware()],
+    ),
+    GetPage(
+      name: '/neuro-wellness/number-match',
+      page: () => const NumberMatchGameView(),
+      middlewares: [AuthMiddleware()],
+    ),
+    GetPage(
+      name: '/neuro-wellness/reaction-time',
+      page: () => const ReactionTimeGameView(),
       middlewares: [AuthMiddleware()],
     ),
     GetPage(

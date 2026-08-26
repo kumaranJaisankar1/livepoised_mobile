@@ -5,6 +5,9 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:safe_text/safe_text.dart';
+import 'package:flutter_timezone/flutter_timezone.dart';
+import 'package:timezone/data/latest.dart' as tzdata;
+import 'package:timezone/timezone.dart' as tz;
 
 import 'core/bindings/initial_binding.dart';
 import 'core/services/push_notification_service.dart';
@@ -12,9 +15,20 @@ import 'core/theme/dark_theme.dart';
 import 'core/theme/light_theme.dart';
 import 'core/theme/theme_controller.dart';
 import 'features/call/presentation/widgets/floating_call_overlay.dart';
+import 'features/neuro_wellness/services/neuro_reminder_service.dart';
 import 'features/notification/presentation/controllers/notification_controller.dart';
 import 'firebase_options.dart';
 import 'routes/app_pages.dart';
+
+Future<void> _initTimezone() async {
+  try {
+    tzdata.initializeTimeZones();
+    final localTimezone = await FlutterTimezone.getLocalTimezone();
+    tz.setLocalLocation(tz.getLocation(localTimezone));
+  } catch (e) {
+    debugPrint('Main: Timezone init failed, defaulting to UTC: $e');
+  }
+}
 
 Future<void> _initFirebaseAndPNS() async {
   try {
@@ -70,6 +84,14 @@ void main() async {
 
   // 2. Initialize Firebase & PNS
   await _initFirebaseAndPNS();
+
+  // 3. Timezone data — needed before NeuroReminderService can schedule a
+  // daily local reminder (tz.local must be set or zonedSchedule throws).
+  // Cheap, local-only, safe to run before runApp.
+  await _initTimezone();
+  try {
+    await NeuroReminderService().restoreIfEnabled();
+  } catch (_) {}
 
   runApp(const LivePoisedApp());
 }

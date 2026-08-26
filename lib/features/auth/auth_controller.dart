@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
 import 'package:get/get.dart';
 import 'auth_service.dart';
 import '../../core/storage/secure_storage_service.dart';
@@ -48,7 +49,7 @@ class AuthController extends GetxController {
       final token = await _storage.getAccessToken();
       if (token == null) {
         isLoggedIn.value = false;
-        Get.offAllNamed('/login');
+        await _navigateUnlessOnActiveCall('/login');
         return;
       }
 
@@ -63,21 +64,55 @@ class AuthController extends GetxController {
         userProfile.value = profile;
         isLoggedIn.value = true;
         _fetchInitialData();
-        Get.offAllNamed('/');
+        await _navigateUnlessOnActiveCall('/');
       } else {
         isLoggedIn.value = false;
         userProfile.value = null;
         await _storage.clearAll();
-        Get.offAllNamed('/login');
+        await _navigateUnlessOnActiveCall('/login');
       }
     } catch (e) {
       print('Error checking auth status: $e');
       isLoggedIn.value = false;
       userProfile.value = null;
-      Get.offAllNamed('/login');
+      await _navigateUnlessOnActiveCall('/login');
     } finally {
       isAuthChecked.value = true;
     }
+  }
+
+  /// This runs on every cold start, racing against a killed-app "accept call
+  /// from CallKit" flow, which navigates to `/active-call` (see
+  /// InitialBinding._consumePendingCallAction / LiveKitService.acceptCall)
+  /// once the native side hands the accept back to Dart — which can take a
+  /// beat longer than this method's own token-refresh network call.
+  /// Without this guard, checkAuthStatus used to win that race and stomp
+  /// the call screen (or the screen it was about to become) with
+  /// Get.offAllNamed('/') / '/login' — confirmed by production testing as a
+  /// visible flash through login/home before the call finally took over,
+  /// and in the worst case a call already connected getting kicked back to
+  /// home (only endable from the ongoing-call notification afterward).
+  Future<void> _navigateUnlessOnActiveCall(String route) async {
+    if (Get.currentRoute == '/active-call') return;
+
+    // The app can be launching specifically to answer a call that was
+    // already accepted natively (CallKit UI) before Flutter's engine was
+    // even up — that acceptance hasn't reached Dart/GetX yet at this exact
+    // moment, but the OS/plugin already knows about it. Give that a short
+    // window to land on /active-call before falling back to the normal
+    // login/home redirect, instead of always taking cold-start's redirect
+    // as first-come-first-served.
+    try {
+      final active = await FlutterCallkitIncoming.activeCalls();
+      if (active is List && active.isNotEmpty) {
+        for (int i = 0; i < 10; i++) {
+          await Future.delayed(const Duration(milliseconds: 100));
+          if (Get.currentRoute == '/active-call') return;
+        }
+      }
+    } catch (_) {}
+
+    Get.offAllNamed(route);
   }
 
   Future<void> loginInApp(String username, String password) async {

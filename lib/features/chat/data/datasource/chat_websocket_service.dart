@@ -176,6 +176,34 @@ class ChatWebSocketService extends GetxService {
     }
   }
 
+  bool get isConnected => _channel != null;
+
+  /// Waits for auth to be ready and the socket to actually be dialed, up to
+  /// [timeout]. Normally connect() is triggered reactively once
+  /// AuthController.checkAuthStatus() populates userProfile — but a
+  /// killed-app cold start that answers a call (via the native CallKit
+  /// accept handle or the pending_call_action marker) can fire
+  /// LiveKitService.acceptCall() before that async auth check has finished,
+  /// while _channel is still null. sendRaw() silently no-ops in that case,
+  /// so the backend never learns the call was accepted and the caller's
+  /// device (web or another mobile device) is left showing "Calling..."
+  /// forever even though this device already joined the LiveKit room.
+  /// Call this before any call:* signal that the other party must receive.
+  Future<bool> ensureConnected({Duration timeout = const Duration(seconds: 6)}) async {
+    if (_channel != null) return true;
+    final deadline = DateTime.now().add(timeout);
+    while (DateTime.now().isBefore(deadline)) {
+      if (_authController.userProfile.value != null) {
+        if (_channel == null && !_isConnecting) {
+          await connect();
+        }
+        if (_channel != null) return true;
+      }
+      await Future.delayed(const Duration(milliseconds: 150));
+    }
+    return _channel != null;
+  }
+
   @override
   void onClose() {
     _channel?.sink.close();

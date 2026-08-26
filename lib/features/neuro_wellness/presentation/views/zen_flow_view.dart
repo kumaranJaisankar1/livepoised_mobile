@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 import 'package:get/get.dart';
+import 'package:get_storage/get_storage.dart';
 import 'dart:async';
+import '../../data/models/game_session.dart';
+import '../controllers/neuro_wellness_controller.dart';
 
 class ZenFlowView extends StatefulWidget {
   const ZenFlowView({super.key});
@@ -13,12 +17,19 @@ class ZenFlowView extends StatefulWidget {
 enum BreathingPhase { initial, inhale, hold, exhale }
 
 class _ZenFlowViewState extends State<ZenFlowView> with SingleTickerProviderStateMixin {
+  static const int _targetCycles = 5;
+  static const String _muteStorageKey = 'zen_flow_muted';
+
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
-  
+  late final FlutterTts _tts;
+
   bool _isStarted = false;
+  bool _isMuted = false;
   BreathingPhase _currentPhase = BreathingPhase.initial;
   int _countdown = 0;
+  int _cyclesCompleted = 0;
+  DateTime? _sessionStart;
   Timer? _phaseTimer;
   Timer? _countdownTimer;
 
@@ -34,6 +45,11 @@ class _ZenFlowViewState extends State<ZenFlowView> with SingleTickerProviderStat
     _scaleAnimation = Tween<double>(begin: 1.0, end: 2.0).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeInOutSine),
     );
+
+    _isMuted = GetStorage().read<bool>(_muteStorageKey) ?? false;
+    _tts = FlutterTts();
+    _tts.setSpeechRate(0.45);
+    _tts.setVolume(1.0);
   }
 
   @override
@@ -41,13 +57,27 @@ class _ZenFlowViewState extends State<ZenFlowView> with SingleTickerProviderStat
     _controller.dispose();
     _phaseTimer?.cancel();
     _countdownTimer?.cancel();
+    _tts.stop();
     super.dispose();
+  }
+
+  void _speak(String text) {
+    if (_isMuted) return;
+    _tts.speak(text);
+  }
+
+  void _toggleMute() {
+    setState(() => _isMuted = !_isMuted);
+    GetStorage().write(_muteStorageKey, _isMuted);
+    if (_isMuted) _tts.stop();
   }
 
   void _startBreathingCycle() {
     setState(() {
       _isStarted = true;
+      _cyclesCompleted = 0;
     });
+    _sessionStart = DateTime.now();
     _runInhalePhase();
   }
 
@@ -57,13 +87,14 @@ class _ZenFlowViewState extends State<ZenFlowView> with SingleTickerProviderStat
       _currentPhase = BreathingPhase.inhale;
       _countdown = _inhaleDuration;
     });
-    
+
     HapticFeedback.lightImpact();
+    _speak("Breathe in");
     _controller.duration = Duration(seconds: _inhaleDuration);
     _controller.forward();
-    
+
     _startCountdownTimer();
-    
+
     _phaseTimer?.cancel();
     _phaseTimer = Timer(Duration(seconds: _inhaleDuration), () {
       _runHoldPhase();
@@ -76,11 +107,12 @@ class _ZenFlowViewState extends State<ZenFlowView> with SingleTickerProviderStat
       _currentPhase = BreathingPhase.hold;
       _countdown = _holdDuration;
     });
-    
+
     HapticFeedback.mediumImpact();
-    
+    _speak("Hold");
+
     _startCountdownTimer();
-    
+
     _phaseTimer?.cancel();
     _phaseTimer = Timer(Duration(seconds: _holdDuration), () {
       _runExhalePhase();
@@ -93,17 +125,23 @@ class _ZenFlowViewState extends State<ZenFlowView> with SingleTickerProviderStat
       _currentPhase = BreathingPhase.exhale;
       _countdown = _exhaleDuration;
     });
-    
+
     HapticFeedback.lightImpact();
+    _speak("Breathe out");
     _controller.duration = Duration(seconds: _exhaleDuration);
     _controller.reverse();
-    
+
     _startCountdownTimer();
-    
+
     _phaseTimer?.cancel();
     _phaseTimer = Timer(Duration(seconds: _exhaleDuration), () {
       HapticFeedback.heavyImpact();
-      _runInhalePhase(); // Loop
+      _cyclesCompleted++;
+      if (_cyclesCompleted >= _targetCycles) {
+        _completeSession();
+      } else {
+        _runInhalePhase(); // Loop
+      }
     });
   }
 
@@ -117,6 +155,7 @@ class _ZenFlowViewState extends State<ZenFlowView> with SingleTickerProviderStat
       setState(() {
         if (_countdown > 1) {
           _countdown--;
+          _speak('$_countdown');
         } else {
           timer.cancel();
         }
@@ -125,6 +164,7 @@ class _ZenFlowViewState extends State<ZenFlowView> with SingleTickerProviderStat
   }
 
   void _stopBreathingCycle() {
+    _recordSessionIfStarted();
     setState(() {
       _isStarted = false;
       _currentPhase = BreathingPhase.initial;
@@ -132,8 +172,35 @@ class _ZenFlowViewState extends State<ZenFlowView> with SingleTickerProviderStat
     });
     _phaseTimer?.cancel();
     _countdownTimer?.cancel();
+    _tts.stop();
     _controller.stop();
     _controller.reverse(from: _controller.value);
+  }
+
+  void _completeSession() {
+    _recordSessionIfStarted();
+    _speak("Session complete. Well done.");
+    setState(() {
+      _isStarted = false;
+      _currentPhase = BreathingPhase.initial;
+      _countdown = 0;
+    });
+    _phaseTimer?.cancel();
+    _countdownTimer?.cancel();
+    _controller.reverse(from: _controller.value);
+  }
+
+  void _recordSessionIfStarted() {
+    if (_sessionStart == null || _cyclesCompleted == 0) return;
+    if (Get.isRegistered<NeuroWellnessController>()) {
+      Get.find<NeuroWellnessController>().recordSession(GameSession(
+        gameId: 'zen_flow',
+        score: ((_cyclesCompleted / _targetCycles) * 100).clamp(0, 100).round(),
+        durationSeconds: DateTime.now().difference(_sessionStart!).inSeconds,
+        completedAt: DateTime.now(),
+      ));
+    }
+    _sessionStart = null;
   }
 
   String _getPhaseInstruction() {
@@ -208,8 +275,14 @@ class _ZenFlowViewState extends State<ZenFlowView> with SingleTickerProviderStat
           ),
           const SizedBox(width: 8),
           Text(
-            "Zen Flow", 
+            "Zen Flow",
             style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)
+          ),
+          const Spacer(),
+          IconButton(
+            icon: Icon(_isMuted ? Icons.volume_off : Icons.volume_up),
+            tooltip: _isMuted ? 'Unmute voice guidance' : 'Mute voice guidance',
+            onPressed: _toggleMute,
           ),
         ],
       ),

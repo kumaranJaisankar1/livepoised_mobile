@@ -14,6 +14,7 @@ import '../../features/chat/presentation/controllers/chat_list_controller.dart';
 import '../services/callkit_service.dart';
 
 const String _pendingCallActionKey = 'pending_call_action';
+const String _activeCallMarkerKey = 'active_call_marker';
 
 class InitialBinding extends Bindings {
   @override
@@ -32,6 +33,43 @@ class InitialBinding extends Bindings {
     CallKitService().init();
 
     _consumePendingCallAction(storage);
+    _consumeActiveCallMarker(storage);
+  }
+
+  /// If the app was killed/crashed while a call was connected (e.g. the
+  /// screen-share foreground-service crash), this reconnects to the same
+  /// room on the next launch instead of silently losing the call — the user
+  /// reopening the app should find themselves back in it, not on the home
+  /// screen with no trace anything was happening.
+  void _consumeActiveCallMarker(GetStorage storage) {
+    final marker = storage.read(_activeCallMarkerKey);
+    if (marker == null) return;
+    storage.remove(_activeCallMarkerKey);
+
+    if (marker is! Map) return;
+
+    final connectedAtStr = marker['connectedAt'] as String?;
+    final connectedAt = connectedAtStr != null ? DateTime.tryParse(connectedAtStr) : null;
+    // Don't try to resume a call from more than 10 minutes ago — almost
+    // certainly long since ended; avoids reconnecting into a stale room if
+    // the app is reopened much later (next day, etc.).
+    if (connectedAt == null || DateTime.now().difference(connectedAt) > const Duration(minutes: 10)) {
+      return;
+    }
+
+    final roomId = marker['roomId'] as String?;
+    final peer = marker['peer'] as String?;
+    if (roomId == null || peer == null) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Get.find<LiveKitService>().resumeActiveCall(
+        roomId: roomId,
+        peer: peer,
+        isVideo: marker['isVideo'] == true,
+        peerName: marker['peerName'] as String?,
+        peerImage: marker['peerImage'] as String?,
+      );
+    });
   }
 
   /// Picks up an "accept" action recorded before GetX/LiveKitService existed
@@ -86,6 +124,14 @@ class InitialBinding extends Bindings {
           timestamp: DateTime.now(),
         );
         Get.toNamed('/chat', arguments: inboxItem);
+      });
+    } else if (action == 'open_network') {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Get.toNamed('/network');
+      });
+    } else if (action == 'open_neuro_wellness') {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Get.toNamed('/neuro-wellness');
       });
     } else if (action == 'end') {
       WidgetsBinding.instance.addPostFrameCallback((_) {

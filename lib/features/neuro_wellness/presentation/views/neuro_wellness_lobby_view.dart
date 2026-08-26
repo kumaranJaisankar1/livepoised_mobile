@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controllers/neuro_wellness_controller.dart';
+import '../widgets/neuro_reminder_tile.dart';
 
 class NeuroWellnessLobbyView extends GetView<NeuroWellnessController> {
   const NeuroWellnessLobbyView({super.key});
@@ -99,7 +100,27 @@ class NeuroWellnessLobbyView extends GetView<NeuroWellnessController> {
                           subtitle: "Boost visual scanning and processing speed.",
                           icon: Icons.wb_cloudy_outlined,
                           color: Colors.teal,
-                          isAvailable: false,
+                          isAvailable: true,
+                        ),
+                        const SizedBox(height: 16),
+                        _buildGameCard(
+                          context,
+                          id: 'number_match',
+                          title: "Number Match",
+                          subtitle: "Quick arithmetic against the clock.",
+                          icon: Icons.calculate_outlined,
+                          color: Colors.orange,
+                          isAvailable: true,
+                        ),
+                        const SizedBox(height: 16),
+                        _buildGameCard(
+                          context,
+                          id: 'reaction_time',
+                          title: "Focus Tap",
+                          subtitle: "Test and train your reaction speed.",
+                          icon: Icons.touch_app_outlined,
+                          color: Colors.pink,
+                          isAvailable: true,
                         ),
                         const SizedBox(height: 120), // Navigator buffer
                       ],
@@ -124,31 +145,92 @@ class NeuroWellnessLobbyView extends GetView<NeuroWellnessController> {
             onPressed: () => Get.back(),
           ),
           const SizedBox(width: 8),
-          Text(
-            "Neuro Wellness", 
-            style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)
+          Expanded(
+            child: Text(
+              "Neuro Wellness",
+              style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+            ),
+          ),
+          TextButton.icon(
+            onPressed: () => _showReminderDialog(context),
+            icon: Icon(Icons.notifications_active_outlined, color: theme.colorScheme.primary, size: 20),
+            label: Text(
+              "Reminder",
+              style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.w600, fontSize: 13),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildStatsHeader(ThemeData theme) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.primary.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: theme.colorScheme.primary.withOpacity(0.2)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _buildStatItem(theme, "Daily Streak", "0", Icons.local_fire_department, Colors.orange),
-          _buildStatItem(theme, "Brain Power", "100%", Icons.bolt, Colors.yellow[700]!),
-        ],
+  void _showReminderDialog(BuildContext context) {
+    final theme = Theme.of(context);
+    Get.dialog(
+      Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+        // Material (not a plain decorated Container) so NeuroReminderTile's
+        // ListTile/SwitchListTile can paint their background/ink splashes
+        // correctly — a DecoratedBox sitting between a ListTile and its
+        // Material ancestor hides those effects (Flutter warns about this
+        // explicitly), and Material's own elevation gives the same shadow.
+        child: Material(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(24),
+          clipBehavior: Clip.antiAlias,
+          elevation: 8,
+          shadowColor: Colors.black.withOpacity(0.18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 8, 4),
+                child: Row(
+                  children: [
+                    Icon(Icons.notifications_active_outlined, color: theme.colorScheme.primary),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        "Daily Reminder",
+                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 20),
+                      onPressed: () => Get.back(),
+                    ),
+                  ],
+                ),
+              ),
+              // Same widget as Settings > Neuro Wellness — both read/write
+              // the same NeuroReminderService state, so toggling it here or
+              // in Settings always agrees.
+              const NeuroReminderTile(),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
       ),
     );
+  }
+
+  Widget _buildStatsHeader(ThemeData theme) {
+    return Obx(() => Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.primary.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: theme.colorScheme.primary.withOpacity(0.2)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildStatItem(theme, "Daily Streak", "${controller.streak.value}", Icons.local_fire_department, Colors.orange),
+              _buildStatItem(theme, "Brain Power", "${controller.brainPower.value}%", Icons.bolt, Colors.yellow[700]!),
+            ],
+          ),
+        ));
   }
 
   Widget _buildStatItem(ThemeData theme, String label, String value, IconData icon, Color color) {

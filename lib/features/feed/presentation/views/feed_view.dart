@@ -47,6 +47,15 @@ class FeedView extends GetView<FeedController> {
             ],
           ),
           actions: [
+            // A single, non-intrusive entry point into a dedicated News &
+            // Articles screen — deliberately not embedded in the post feed
+            // itself (that was tried and felt disruptive to the community
+            // feed's own scroll/rhythm); this is a one-tap door to it instead.
+            IconButton(
+              icon: const Icon(Icons.article_outlined),
+              tooltip: 'News & Articles',
+              onPressed: () => Get.toNamed('/news'),
+            ),
             Obx(() {
               final unreadCount = Get.find<NotificationController>().unreadCount.value;
               return Badge.count(
